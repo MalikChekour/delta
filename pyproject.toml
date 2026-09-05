@@ -1,0 +1,33 @@
+[project]
+name = "hermes-agent"
+version = "0.1.0"
+description = "Hermes - agent Telegram multi-provider capable de coder, exécuter et chercher"
+requires-python = ">=3.11"
+dependencies = [
+    "python-telegram-bot[rate-limiter]>=22.0",
+    "openai>=1.60.0",
+    "anthropic>=0.49.0",
+    "httpx>=0.27",
+    "python-dotenv>=1.0",
+    "selectolax>=0.3.21",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.24", "ruff>=0.6"]
+
+[project.scripts]
+hermes = "hermes.__main__:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["hermes*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
