@@ -1,0 +1,24 @@
+services:
+  hermes:
+    build: .
+    image: hermes-agent:latest
+    container_name: hermes
+    env_file: .env
+    # La ligne qui repond a "l'agent est deconnecte" : il redemarre seul,
+    # apres un plantage comme apres un reboot de la machine.
+    restart: unless-stopped
+    volumes:
+      - hermes-data:/data
+    # Bornes dures : une boucle infinie ecrite par l'agent ne prend pas la machine.
+    mem_limit: 4g
+    pids_limit: 512
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  hermes-data:

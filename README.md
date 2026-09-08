@@ -99,11 +99,74 @@ ollama serve
 ollama pull hermes4:70b
 ```
 
-### 4. Lancer
+### 4. Verifier avant de lancer
+
+```bash
+python -m hermes --check
+```
+
+Le diagnostic teste, dans l'ordre : la configuration, l'ecriture dans le
+workspace, le token aupres de Telegram, **la presence d'une autre instance**,
+**un webhook concurrent**, puis un appel reel au modele. Il nomme la panne au
+lieu de laisser le bot muet.
+
+```
+[  OK  ] Token Telegram
+         @mon_hermes_bot (id 8123456789)
+[ ECHEC] Instance unique
+         409 Conflict : une AUTRE instance d'Hermes tourne deja avec ce token.
+```
+
+### 5. Lancer
 
 ```bash
 python -m hermes
 ```
+
+## Rester connecte
+
+`python -m hermes` s'arrete des que tu fermes le terminal, et ne revient pas
+apres un plantage ou un reboot. Pour un bot qui reste en ligne, deux options.
+
+### Docker (recommande)
+
+Le conteneur est aussi la frontiere de securite : l'agent execute du code, mieux
+vaut qu'il le fasse ailleurs que sur ton systeme de fichiers.
+
+```bash
+cp .env.example .env      # remplir
+docker compose up -d
+docker compose logs -f
+```
+
+`restart: unless-stopped` le relance apres un plantage **et** apres un reboot.
+L'image tourne sans privileges, avec 4 Go et 512 processus au maximum — une
+boucle infinie ecrite par l'agent ne prend pas la machine.
+
+### systemd
+
+```bash
+sudo cp deploy/hermes.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now hermes
+journalctl -u hermes -f
+```
+
+`ExecStartPre` lance `--check` : le service refuse de demarrer sur une
+configuration cassee, plutot que de tourner en silence sans repondre.
+
+### Quand le bot ne repond plus
+
+| Symptome | Cause la plus frequente |
+|---|---|
+| Aucune reponse, aucun log | Le processus est mort. `docker compose ps` / `systemctl status hermes` |
+| Les logs tournent mais rien n'arrive | Deux instances sur le meme token, ou un webhook actif. `--check` les detecte |
+| « Acces refuse » | Ton identifiant n'est pas dans `HERMES_ALLOWED_USERS` |
+| Erreur a chaque message | Cle du modele invalide ou modele inexistant. `--check` fait un appel reel |
+
+Telegram n'autorise **qu'un seul** processus en polling par token. Lancer une
+seconde instance rend les deux inutilisables : c'est la cause numero un d'un bot
+qui « se deconnecte ».
 
 ## Ou tourner Hermes
 
@@ -144,6 +207,9 @@ Tout est dans [`.env.example`](.env.example). Les reglages qui comptent :
 | `/status` | Fournisseur, modele, taille de l'historique |
 | `/reset` | Efface l'historique, garde le choix de modele |
 
+En ligne de commande : `python -m hermes --check` diagnostique, `-v` passe les
+journaux en DEBUG.
+
 ## Ajouter un fournisseur
 
 Une entree dans `hermes/providers.py`, rien d'autre :
@@ -161,10 +227,12 @@ Une entree dans `hermes/providers.py`, rien d'autre :
 ## Tests
 
 ```bash
-pytest        # 33 tests
+pytest        # 41 tests
 ruff check .
 ```
 
 Couvrent le confinement des chemins, le retrait des secrets de l'environnement,
 le timeout, la troncature d'historique sans casser les paires appel/resultat, la
-traduction vers le protocole Anthropic et la boucle agentique complete.
+traduction vers le protocole Anthropic et la boucle agentique complete. Le
+diagnostic est teste contre de vrais serveurs HTTP jetables, y compris les cas
+409 Conflict et webhook concurrent.
