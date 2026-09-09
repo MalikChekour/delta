@@ -52,6 +52,7 @@ def settings(tmp_path: Path) -> Settings:
         custom_base_url="",
         claim_owner=False,
         drop_pending=False,
+        announce=False,
         enable_shell=True,
         enable_web=True,
         search_url="https://example.invalid/",

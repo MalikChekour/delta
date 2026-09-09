@@ -15,6 +15,10 @@ ExecStart=/opt/hermes/.venv/bin/hermes run
 Restart=always
 RestartSec=5
 
+# La surdite — service vivant mais boucle de reception arretee — est detectee
+# par Hermes lui-meme, qui redemarre son application. Restart=always ne couvre
+# que la mort du processus.
+
 # Durcissement : le service ecrit dans son workspace, nulle part ailleurs.
 NoNewPrivileges=true
 PrivateTmp=true

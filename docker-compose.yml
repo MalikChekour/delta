@@ -5,6 +5,12 @@ services:
     env_file: .env
     volumes:
       - hermes-data:/data
+    healthcheck:
+      test: ["CMD", "hermes", "health"]
+      interval: 60s
+      timeout: 10s
+      start_period: 45s
+      retries: 3
     # L'agent execute du code arbitraire : on lui donne un conteneur, pas l'hote.
     security_opt:
       - no-new-privileges:true

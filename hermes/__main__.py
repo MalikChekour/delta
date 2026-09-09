@@ -4,6 +4,7 @@
     hermes doctor     # verifie configuration, Telegram et routes de modeles
     hermes chat       # dialogue avec l'agent dans le terminal, sans Telegram
     hermes models     # affiche le catalogue et l'etat des routes
+    hermes health     # dit si le service en cours tourne et ecoute
 """
 
 from __future__ import annotations
@@ -13,7 +14,7 @@ import asyncio
 import logging
 import sys
 
-from . import __version__, config, doctor, providers
+from . import __version__, config, doctor, health, providers
 from .errors import HermesError
 
 
@@ -44,6 +45,25 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
     checks = asyncio.run(doctor.run(settings, deep=args.deep))
     print(doctor.render(checks))
     return 1 if any(check.level == doctor.FAIL for check in checks) else 0
+
+
+def _cmd_health(args: argparse.Namespace) -> int:
+    """Etat du service, pour un superviseur (Docker, systemd) ou pour soi.
+
+    Code de retour 0 : le bot bat et ecoute. 1 : il est arrete ou muet — c'est
+    ce qui doit declencher un redemarrage automatique.
+    """
+    settings = config.load(require_telegram=False)
+    battements = health.Heartbeat(settings.data_dir / "heartbeat")
+    age = battements.age()
+    if age is None:
+        print("Aucun battement : le service n'a jamais demarre ici.")
+        return 1
+    if age > health.LIMITE:
+        print(f"Muet depuis {age:.0f} s (limite {health.LIMITE:.0f} s).")
+        return 1
+    print(f"En ligne, dernier battement il y a {age:.0f} s.")
+    return 0
 
 
 def _cmd_models(args: argparse.Namespace) -> int:
@@ -113,6 +133,9 @@ def main(argv: list[str] | None = None) -> int:
     doctor_parser.set_defaults(func=_cmd_doctor)
 
     sub.add_parser("models", help="catalogue et etat des routes").set_defaults(func=_cmd_models)
+    sub.add_parser("health", help="le service tourne-t-il et ecoute-t-il ?").set_defaults(
+        func=_cmd_health
+    )
 
     chat_parser = sub.add_parser("chat", help="dialogue dans le terminal")
     chat_parser.add_argument("--chat-id", type=int, default=-1, help="identifiant de session")

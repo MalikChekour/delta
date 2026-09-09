@@ -29,6 +29,20 @@ class Check:
         return f"{self.level} {self.title}" + (f"\n     {self.detail}" if self.detail else "")
 
 
+def _service(settings: Settings) -> Check:
+    """Un bot arrete ou devenu sourd est la premiere cause de non-reponse."""
+    from .health import LIMITE, Heartbeat
+
+    age = Heartbeat(settings.data_dir / "heartbeat").age()
+    if age is None:
+        return Check(WARN, "Service", "a l'arret (aucun battement enregistre ici)")
+    if age > LIMITE:
+        return Check(
+            WARN, "Service", f"a l'arret ou muet : dernier battement il y a {age:.0f} s"
+        )
+    return Check(OK, "Service", f"en ligne, battement il y a {age:.0f} s")
+
+
 def _whitelist(settings: Settings) -> Check:
     """Qui aura le droit de parler au bot ? La question n'est jamais anodine :
     Hermes execute des commandes sur la machine hote."""
@@ -130,6 +144,7 @@ async def run(settings: Settings, *, deep: bool = False) -> list[Check]:
         else Check(FAIL, "Workspace", f"{settings.workspace} n'existe pas")
     )
     checks.append(_whitelist(settings))
+    checks.append(_service(settings))
     checks.append(await _telegram(settings))
 
     seen: set[Route] = set()

@@ -154,9 +154,46 @@ le respect des invariants du protocole et le rendu Telegram — sont verifies pa
 tirage aleatoire en plus des tests unitaires.
 
 ```bash
-make test    # 126 tests, sans acces reseau
+make test    # 144 tests, sans acces reseau
 make lint
 ```
+
+## Ne jamais rester muet
+
+Un bot qui ne repond pas *sans rien dire* est la panne la plus penible : rien
+ne distingue un service arrete d'un service qui ignore les messages. Hermes
+traite les trois causes possibles.
+
+**Il est arrete.** `hermes run` est son propre superviseur : une exception non
+rattrapee relance l'application, avec une attente qui double a chaque echec
+(2 s, 4 s… jusqu'a 60 s) pour ne pas marteler l'API si la panne dure. Seul un
+arret demande — Ctrl-C, SIGTERM — met fin a la boucle. Docker
+(`restart: unless-stopped`) et systemd (`Restart=always`) couvrent en plus la
+mort du processus et le redemarrage de la machine.
+
+**Il tourne mais n'ecoute plus.** La boucle de reception peut s'arreter sans
+que le processus meure : c'est l'etat le plus trompeur, car tout semble
+normal. Une surveillance interne le constate en moins d'une minute et redemarre
+l'application. Elle ecrit aussi un battement dans `data/heartbeat`, que
+n'importe quel superviseur peut lire :
+
+```bash
+hermes health     # « En ligne, dernier battement il y a 12 s. » — code 0
+                  # « Muet depuis 340 s. » — code 1, il faut redemarrer
+```
+
+C'est ce que verifie le `HEALTHCHECK` du conteneur : Docker redemarre Hermes
+s'il devient sourd, pas seulement s'il meurt. `hermes doctor` affiche la meme
+information.
+
+**Le message est arrive pendant une coupure.** Il est traite au redemarrage, et
+la reponse mentionne son age (`ton message datait d'il y a 12 min`) pour qu'une
+reponse tardive ne surprenne pas. `HERMES_DROP_PENDING=1` pour les ignorer
+apres une longue interruption.
+
+Enfin, Hermes previent ses proprietaires quand il demarre et quand il s'arrete
+(`HERMES_ANNOUNCE=0` pour s'en passer) : savoir que le bot est revenu vaut mieux
+que de le deviner en lui ecrivant dans le vide.
 
 ## Securite
 
@@ -194,6 +231,7 @@ hermes/
   memory.py       SQLite, verrou par chat, proprietaires
   tools/          shell, python, fichiers, web
   formatting.py   Markdown → HTML Telegram, decoupage sur
+  health.py       battement et surveillance de la boucle de reception
   bot.py          interface Telegram
   doctor.py       diagnostic
 ```

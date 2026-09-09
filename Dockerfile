@@ -16,8 +16,10 @@ ENV PYTHONUNBUFFERED=1 \
     HERMES_DATA_DIR=/data
 VOLUME ["/data"]
 
-# Verifie que la configuration tient debout avant de declarer le service sain.
-HEALTHCHECK --interval=5m --timeout=60s --start-period=30s \
-    CMD hermes doctor >/dev/null || exit 1
+# On verifie que le bot *ecoute*, pas seulement qu'il est vivant : un service
+# qui tourne sans recevoir les messages est le pire des etats, car il ne
+# ressemble a rien de visible.
+HEALTHCHECK --interval=60s --timeout=10s --start-period=45s --retries=3 \
+    CMD hermes health >/dev/null || exit 1
 
 CMD ["hermes", "run"]

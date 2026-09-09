@@ -11,7 +11,9 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import time
 from collections import defaultdict
+from datetime import datetime, timezone
 from typing import Any
 
 from telegram import BotCommand, Update
@@ -31,6 +33,7 @@ from . import formatting, providers
 from .agent import Agent, format_error
 from .config import Settings
 from .errors import ToolError
+from .health import Heartbeat, surveiller
 from .memory import Store
 from .sandbox import disk_free, resolve_in
 from .tools import build_registry
@@ -144,10 +147,55 @@ class Taches:
         return len(taches)
 
 
+#: Au-dela, une reponse tardive merite d'etre expliquee.
+RETARD_NOTABLE = 120
+
+
+def _retard(message: Any) -> str:
+    """Mentionne l'age du message quand la reponse arrive longtemps apres.
+
+    Un message envoye pendant une coupure est traite au redemarrage : sans
+    cette mention, la reponse tombe sans contexte, des heures plus tard.
+    """
+    envoye = getattr(message, "date", None)
+    if envoye is None:
+        return ""
+    try:
+        age = (datetime.now(timezone.utc) - envoye).total_seconds()
+    except TypeError:
+        return ""
+    if age < RETARD_NOTABLE:
+        return ""
+    if age < 3600:
+        delai = f"{age / 60:.0f} min"
+    elif age < 86400:
+        delai = f"{age / 3600:.0f} h"
+    else:
+        delai = f"{age / 86400:.0f} j"
+    return f" (ton message datait d'il y a {delai}, je le traite maintenant)"
+
+
 async def _quiet(coro: Any) -> None:
     """Execute une operation Telegram accessoire ; son echec n'a pas d'importance."""
     with contextlib.suppress(BadRequest, TimedOut, NetworkError, Forbidden, RetryAfter):
         await coro
+
+
+async def annoncer(bot: Any, destinataires: set[int], texte: str) -> int:
+    """Previent les proprietaires. Renvoie le nombre d'avis remis.
+
+    C'est le message qui dit « je suis revenu » : son echec ne doit pas
+    interrompre le demarrage, mais il ne doit pas non plus passer inapercu —
+    sans quoi on retombe sur un bot silencieux dont personne ne sait rien.
+    """
+    remis = 0
+    for destinataire in sorted(destinataires):
+        try:
+            await bot.send_message(destinataire, texte)
+            remis += 1
+        except Exception as exc:  # noqa: BLE001 - un avis raté ne bloque rien
+            log.warning("Avis non remis a %s : %s", destinataire, exc)
+    return remis
 
 
 # --------------------------------------------------------------------------- #
@@ -155,7 +203,13 @@ async def _quiet(coro: Any) -> None:
 # --------------------------------------------------------------------------- #
 
 
-def build_application(settings: Settings) -> Application:
+def build_application(settings: Settings, panne: dict[str, bool] | None = None) -> Application:
+    """Assemble l'application Telegram.
+
+    ``panne`` est le drapeau partage avec ``run`` : la surveillance y inscrit
+    une demande de redemarrage quand elle constate que la boucle de reception
+    s'est arretee.
+    """
     registry = build_registry(
         enable_shell=settings.enable_shell, enable_web=settings.enable_web
     )
@@ -376,7 +430,7 @@ def build_application(settings: Settings) -> Application:
         # la demande plutot que de la perdre.
         status = None
         with contextlib.suppress(Exception):
-            status = await _retrying(message.reply_text, "⏳ …")
+            status = await _retrying(message.reply_text, f"⏳ …{_retard(message)}")
         typing = asyncio.create_task(_keep_typing(context, chat_id))
 
         async def progress(line: str) -> None:
@@ -457,6 +511,9 @@ def build_application(settings: Settings) -> Application:
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, guarded(on_text)))
     application.add_error_handler(on_error)
 
+    battements = Heartbeat(settings.data_dir / "heartbeat")
+    surveillance: dict[str, asyncio.Task[None] | None] = {"tache": None}
+
     async def post_init(app: Application) -> None:
         await app.bot.set_my_commands(COMMANDS)
         me = await app.bot.get_me()
@@ -467,17 +524,86 @@ def build_application(settings: Settings) -> Application:
             len(registry),
         )
 
+        def en_ecoute() -> bool:
+            return bool(app.updater and app.updater.running)
+
+        def sur_panne() -> None:
+            if panne is not None:
+                panne["redemarrer"] = True
+            app.stop_running()
+
+        surveillance["tache"] = asyncio.create_task(
+            surveiller(battements, en_ecoute, sur_panne)
+        )
+
+        if settings.announce:
+            # Savoir que le bot est revenu vaut mieux que de le deviner en lui
+            # ecrivant dans le vide.
+            await annoncer(
+                app.bot,
+                owners,
+                f"Hermes est en ligne — {', '.join(settings.model_chain)}, "
+                f"{len(registry)} outils.",
+            )
+
+    async def post_shutdown(app: Application) -> None:
+        tache = surveillance["tache"]
+        if tache is not None:
+            tache.cancel()
+        if settings.announce:
+            await annoncer(app.bot, owners, "Hermes s'arrete.")
+
     application.post_init = post_init
+    application.post_shutdown = post_shutdown
     return application
 
 
+#: Attente initiale avant un redemarrage automatique, doublee a chaque echec.
+BACKOFF_INITIAL = 2.0
+BACKOFF_MAX = 60.0
+
+
+def prochain_delai(delai: float) -> float:
+    return min(delai * 2, BACKOFF_MAX)
+
+
 def run(settings: Settings) -> None:
-    """Demarre le bot en long polling, jusqu'a interruption."""
-    application = build_application(settings)
-    # Par defaut, les messages recus pendant un arret sont traites au redemarrage.
-    # Les jeter donnerait a l'utilisateur un bot qui ignore sa demande sans rien
-    # dire — le pire des symptomes. HERMES_DROP_PENDING=1 pour l'inverse, utile
-    # apres une longue interruption ou d'anciennes consignes n'ont plus de sens.
-    application.run_polling(
-        drop_pending_updates=settings.drop_pending, allowed_updates=Update.ALL_TYPES
-    )
+    """Demarre le bot, et le maintient en vie.
+
+    Une exception non rattrapee ou une boucle de reception arretee ne doivent
+    pas laisser un bot muet : on relance, avec une attente qui double a chaque
+    echec pour ne pas marteler l'API si la panne est durable. Seul un arret
+    demande — Ctrl-C, SIGTERM — met fin a la boucle.
+
+    Cette supervision interne complete, sans la remplacer, celle de Docker ou
+    de systemd : elle protege aussi ceux qui lancent `hermes run` a la main.
+    """
+    panne = {"redemarrer": False}
+    delai = BACKOFF_INITIAL
+
+    while True:
+        panne["redemarrer"] = False
+        application = build_application(settings, panne)
+        try:
+            # Par defaut, les messages recus pendant un arret sont traites au
+            # redemarrage. Les jeter donnerait un bot qui ignore une demande
+            # sans rien dire — le pire des symptomes. HERMES_DROP_PENDING=1
+            # pour l'inverse, apres une longue interruption ou d'anciennes
+            # consignes n'ont plus de sens.
+            application.run_polling(
+                drop_pending_updates=settings.drop_pending,
+                allowed_updates=Update.ALL_TYPES,
+            )
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except Exception:  # noqa: BLE001 - toute panne doit mener a un redemarrage
+            log.exception("Le service s'est interrompu sur une erreur")
+            panne["redemarrer"] = True
+
+        if not panne["redemarrer"]:
+            log.info("Arret demande.")
+            return
+
+        log.warning("Redemarrage dans %.0f s.", delai)
+        time.sleep(delai)
+        delai = prochain_delai(delai)
