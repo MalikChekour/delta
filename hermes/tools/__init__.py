@@ -105,9 +105,15 @@ class Registry:
             return f"ERREUR : outil inconnu {name!r}. Outils disponibles : {known}."
         try:
             item.check(arguments)
-            result = item.handler(ctx, arguments)
-            if inspect.isawaitable(result):
-                result = await result
+            # Un outil synchrone lit des fichiers ou parcourt des dossiers : execute
+            # dans la boucle d'evenements, il gelerait tout le bot — y compris les
+            # autres conversations et la relance du polling Telegram.
+            if inspect.iscoroutinefunction(item.handler):
+                result = await item.handler(ctx, arguments)
+            else:
+                result = await asyncio.to_thread(item.handler, ctx, arguments)
+                if inspect.isawaitable(result):
+                    result = await result
             text = result if isinstance(result, str) else str(result)
             return text or "[aucune sortie]"
         except ToolError as exc:

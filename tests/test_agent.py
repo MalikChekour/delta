@@ -152,3 +152,19 @@ async def test_tours_simultanes_sont_serialises(settings):
     assert ordre == ["debut", "fin", "debut", "fin"]
     session = await agent.store.load(9)
     assert [m["role"] for m in session.messages].count("user") == 2
+
+
+async def test_reponse_vide_du_modele_est_expliquee(settings):
+    """Un modele renvoie parfois ni texte ni appel d'outil : sans garde-fou,
+    l'utilisateur ne verrait rien et croirait a une panne."""
+    agent, _ = agent_avec(settings, [text_reply("   ")])
+    run = await agent.respond(1, "salut")
+    assert "n'a rien renvoye" in run.text
+
+
+async def test_reponse_tronquee_est_signalee(settings):
+    vide = text_reply("")
+    vide.finish_reason = "length"
+    agent, _ = agent_avec(settings, [vide])
+    run = await agent.respond(1, "salut")
+    assert "jetons" in run.text

@@ -89,7 +89,7 @@ async def run(
         _kill_tree(process)
         try:
             stdout, _ = await asyncio.wait_for(process.communicate(), timeout=5)
-        except (asyncio.TimeoutError, Exception):  # noqa: BLE001
+        except (asyncio.TimeoutError, OSError):
             stdout = b""
         partial = clip(stdout.decode("utf-8", "replace"), output_limit)
         return (

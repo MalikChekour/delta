@@ -79,3 +79,45 @@ def test_trim_garde_tout_si_la_fenetre_suffit():
 def test_trim_sans_message_utilisateur_recent():
     messages = [{"role": "assistant", "content": f"m{i}"} for i in range(5)]
     assert trim(messages, 2) == []
+
+
+def test_identifiants_reutilises_d_un_tour_a_l_autre():
+    """vLLM, Ollama et llama.cpp numerotent les appels a partir de zero dans
+    chaque message : `call_0` reapparait a chaque tour. Un dedoublonnage
+    portant sur tout l'historique remplacait alors le resultat legitime du
+    second tour par un resultat de substitution — l'agent perdait ses propres
+    observations sans que rien ne le signale."""
+    messages = [
+        {"role": "user", "content": "tour 1"},
+        {"role": "assistant", "content": "", "tool_calls": [call("call_0")]},
+        {"role": "tool", "tool_call_id": "call_0", "content": "RESULTAT 1"},
+        {"role": "assistant", "content": "fini 1"},
+        {"role": "user", "content": "tour 2"},
+        {"role": "assistant", "content": "", "tool_calls": [call("call_0")]},
+        {"role": "tool", "tool_call_id": "call_0", "content": "RESULTAT 2"},
+    ]
+    out = sanitize(messages)
+    contenus = [m["content"] for m in out if m["role"] == "tool"]
+    assert contenus == ["RESULTAT 1", "RESULTAT 2"]
+    assert MISSING_RESULT not in contenus
+
+
+def test_sanitize_est_idempotent():
+    messages = [
+        {"role": "assistant", "content": "", "tool_calls": [call("c0"), call("c1")]},
+        {"role": "tool", "tool_call_id": "c1", "content": "r"},
+        {"role": "user", "content": "suite"},
+        {"role": "tool", "tool_call_id": "c0", "content": "orphelin"},
+    ]
+    une = sanitize(messages)
+    assert sanitize(une) == une
+
+
+def test_ordre_des_resultats_preserve():
+    messages = [
+        {"role": "assistant", "content": "", "tool_calls": [call("a"), call("b"), call("c")]},
+        {"role": "tool", "tool_call_id": "c", "content": "trois"},
+        {"role": "tool", "tool_call_id": "a", "content": "un"},
+    ]
+    out = sanitize(messages)
+    assert [m["content"] for m in out[1:]] == ["trois", "un", MISSING_RESULT]

@@ -159,3 +159,77 @@ async def test_sortie_tronquee(context):
     registry = build_registry(enable_web=False)
     out = await registry.dispatch(context, "shell", {"command": "seq 1 10000"})
     assert len(out) < 400 and "omis" in out
+
+
+# -- defauts trouves a la relecture ---------------------------------------
+
+
+async def test_appels_python_simultanes_ne_se_melangent_pas(context):
+    """Le modele emet souvent plusieurs appels dans un meme tour, executes en
+    parallele. Avec un fichier temporaire de nom fixe, l'un executait le code
+    de l'autre en silence."""
+    registry = build_registry(enable_web=False)
+    import asyncio
+
+    lent = "import time; time.sleep(0.3); print('AAA')"
+    premier, second = await asyncio.gather(
+        registry.dispatch(context, "python", {"code": lent}),
+        registry.dispatch(context, "python", {"code": "print('BBB')"}),
+    )
+    assert "AAA" in premier and "BBB" not in premier
+    assert "BBB" in second and "AAA" not in second
+
+
+async def test_le_script_temporaire_est_efface(context):
+    registry = build_registry(enable_web=False)
+    await registry.dispatch(context, "python", {"code": "print(1)"})
+    assert not list(context.workspace.glob(".hermes_*.py"))
+
+
+async def test_outil_synchrone_ne_bloque_pas_la_boucle(context):
+    """Un outil synchrone execute dans la boucle d'evenements gelerait tout le
+    bot — les autres conversations comme le polling Telegram."""
+    import asyncio
+
+    registry = Registry()
+
+    def lent(ctx, args):
+        import time
+
+        time.sleep(0.2)
+        return "fini"
+
+    registry.add(Tool("lent", "Lent.", {"type": "object", "properties": {}}, lent))
+
+    battements = 0
+
+    async def coeur():
+        nonlocal battements
+        while True:
+            battements += 1
+            await asyncio.sleep(0.005)
+
+    tache = asyncio.create_task(coeur())
+    await asyncio.sleep(0.01)
+    battements = 0
+    assert await registry.dispatch(context, "lent", {}) == "fini"
+    tache.cancel()
+    assert battements > 3, "la boucle d'evenements est restee bloquee"
+
+
+async def test_liste_de_fichiers_s_arrete_a_la_limite(context):
+    for index in range(700):
+        (context.workspace / f"f{index}.txt").write_text("x")
+    registry = build_registry(enable_web=False)
+    sortie = await registry.dispatch(context, "list_files", {"path": "."})
+    assert "tronquee" in sortie
+    assert len(sortie.splitlines()) <= 501
+
+
+async def test_liste_de_fichiers_ignore_les_dossiers_caches(context):
+    (context.workspace / ".git").mkdir()
+    (context.workspace / ".git/objet").write_text("x")
+    (context.workspace / "visible.txt").write_text("x")
+    registry = build_registry(enable_web=False)
+    sortie = await registry.dispatch(context, "list_files", {"path": "."})
+    assert "visible.txt" in sortie and ".git" not in sortie

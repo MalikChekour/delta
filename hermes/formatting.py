@@ -30,6 +30,28 @@ _HEADING = re.compile(r"^\s{0,3}(#{1,6})\s+(.*)$")
 _BULLET = re.compile(r"^(\s*)[-*+]\s+")
 
 _PLACEHOLDER = "\x00{}\x00"
+_BALISE = re.compile(r"</?(b|i|s|u|code|pre|a)\b[^>]*>")
+
+
+def bien_formee(fragment: str) -> bool:
+    """Vrai si les balises sont correctement imbriquees.
+
+    Telegram refuse le croisement (``<s>a<i>b</s>c</i>``) comme l'imbrication
+    d'une balise dans elle-meme. Or les conversions gras/italique/barre sont
+    appliquees independamment : un balisage entremele dans le texte du modele
+    peut donc produire l'un ou l'autre. On le detecte ici plutot que de l'envoyer.
+    """
+    pile: list[str] = []
+    for marque in _BALISE.finditer(fragment):
+        nom = marque.group(1)
+        if marque.group(0).startswith("</"):
+            if not pile or pile.pop() != nom:
+                return False
+        elif nom in pile:
+            return False
+        else:
+            pile.append(nom)
+    return not pile
 
 
 def _inline(text: str) -> str:
@@ -68,13 +90,20 @@ def _inline(text: str) -> str:
 
 
 def _render_text_line(line: str) -> str:
+    """Rend une ligne, en repliant sur du texte nu si le balisage sort faux.
+
+    Mieux vaut une ligne sans mise en forme qu'un message entier refuse par
+    Telegram : ce repli garantit que toute entree, si tordue soit-elle, produit
+    un fragment valide."""
     heading = _HEADING.match(line)
-    if heading:
-        return f"<b>{_inline(heading.group(2).strip())}</b>"
     bullet = _BULLET.match(line)
-    if bullet:
-        return f"{bullet.group(1)}• {_inline(line[bullet.end():])}"
-    return _inline(line)
+    if heading:
+        rendu = f"<b>{_inline(heading.group(2).strip())}</b>"
+    elif bullet:
+        rendu = f"{bullet.group(1)}• {_inline(line[bullet.end() :])}"
+    else:
+        rendu = _inline(line)
+    return rendu if bien_formee(rendu) else html.escape(line)
 
 
 def to_html_lines(markdown: str) -> list[tuple[bool, str]]:
@@ -164,11 +193,13 @@ def chunks(markdown: str, limit: int = CHUNK_LIMIT) -> list[str]:
     return messages or [""]
 
 
-def plain(markdown: str, limit: int = CHUNK_LIMIT) -> list[str]:
-    """Repli sans balise, utilise si Telegram refuse malgre tout le HTML."""
-    text = markdown
-    out: list[str] = []
-    while text:
-        out.append(text[:limit])
-        text = text[limit:]
-    return out or [""]
+def strip_tags(fragment: str) -> str:
+    """Rend un fragment HTML en texte nu.
+
+    Sert de dernier repli quand Telegram refuse malgre tout le balisage : on
+    envoie le meme morceau sans balise, plutot que de perdre la reponse.
+    """
+    text = re.sub(r"<br\s*/?>", "\n", fragment)
+    text = re.sub(r"</(p|pre|div)>", "\n", text)
+    text = re.sub(r"<[^>]+>", "", text)
+    return html.unescape(text).strip()

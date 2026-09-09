@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+from pathlib import Path
 from typing import Any
 
 from ..errors import ToolError
@@ -9,6 +11,10 @@ from ..sandbox import clip, resolve_in
 from . import ToolContext, tool
 
 MAX_WRITE = 2_000_000
+
+
+def _ignore(name: str) -> bool:
+    return name.startswith(".") or name == "__pycache__"
 
 
 @tool(
@@ -100,15 +106,27 @@ def list_files(ctx: ToolContext, args: dict[str, Any]) -> str:
         raise ToolError(f"{args.get('path', '.')} n'est pas un dossier.")
     depth = max(1, int(args.get("depth") or 2))
     entries: list[str] = []
-    for item in sorted(root.rglob("*")):
-        relative = item.relative_to(root)
-        if len(relative.parts) > depth:
-            continue
-        if any(part.startswith(".") or part == "__pycache__" for part in relative.parts):
-            continue
-        marker = "/" if item.is_dir() else f"  ({item.stat().st_size} o)"
-        entries.append(f"{relative}{marker}")
+    # os.walk plutot que rglob : on elague les dossiers ignores et on s'arrete
+    # des la limite atteinte. rglob("*") parcourait tout l'arbre avant de
+    # tronquer — sur un workspace contenant un node_modules, cela prenait des
+    # secondes pour n'afficher que les 500 premieres entrees.
+    for current, dirs, files in os.walk(root):
+        relative = Path(current).relative_to(root)
+        level = 0 if str(relative) == "." else len(relative.parts)
+        dirs[:] = [] if level >= depth else sorted(d for d in dirs if not _ignore(d))
+        for name in dirs:
+            entries.append(f"{relative / name if level else name}/")
+        for name in sorted(files):
+            if _ignore(name):
+                continue
+            path = Path(current) / name
+            try:
+                size = path.stat().st_size
+            except OSError:
+                continue  # disparu entre le parcours et la lecture
+            entries.append(f"{relative / name if level else name}  ({size} o)")
         if len(entries) >= 500:
+            entries = entries[:500]
             entries.append("[... liste tronquee a 500 entrees]")
             break
     return "\n".join(entries) or "[dossier vide]"

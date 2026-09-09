@@ -109,28 +109,52 @@ une par une, et chacune a son test de non-regression.
   retablit les invariants du protocole avant chaque envoi et avant chaque
   ecriture en base ; la sauvegarde a lieu dans un `finally`, y compris quand le
   tour echoue ou est annule.
+- **Identifiants d'appels reutilises.** vLLM, Ollama et llama.cpp numerotent les
+  appels a partir de zero dans *chaque* message : `call_0` reapparait a chaque
+  tour. Le rapprochement appel/resultat se fait donc par lot, jamais sur
+  l'historique entier — sans quoi tout resultat d'outil a partir du deuxieme
+  tour passerait pour un doublon et serait remplace par un resultat de
+  substitution : l'agent perdrait ses propres observations en silence.
 - **Balisage refuse par Telegram.** Envoyer le Markdown d'un modele tel quel
   echoue des qu'une asterisque traine ou qu'un bloc de code n'est pas ferme.
   Hermes convertit lui-meme en HTML et decoupe *ligne par ligne*, en refermant
-  les balises a chaque frontiere : chaque morceau envoye est complet, quoi que
-  le modele ait produit.
+  les balises a chaque frontiere. Un balisage entremele (`~~a *b~~ c*`)
+  produirait des balises croisees, que Telegram refuse : chaque ligne rendue est
+  verifiee, et repliee en texte nu si elle sort mal formee.
+- **Appels d'outils simultanes.** Le modele emet souvent plusieurs appels dans un
+  meme tour, executes en parallele. L'outil `python` ecrit donc son script sous
+  un nom unique : avec un nom fixe, un appel executait le code d'un autre sans
+  que rien ne le signale.
+- **Boucle d'evenements bloquee.** Un outil synchrone qui lit un fichier ou
+  parcourt un dossier gelerait tout le bot — les autres conversations comme le
+  polling Telegram. Ils sont executes hors de la boucle, et le parcours de
+  dossiers s'arrete des la limite atteinte au lieu de traverser l'arbre entier.
 - **Messages simultanes.** Deux messages envoyes coup sur coup liraient le meme
   historique et le dernier ecraserait l'autre. Un verrou par `chat_id`
-  serialise les tours d'une conversation sans bloquer les autres.
+  serialise les tours d'une conversation sans bloquer les autres — et `/stop`
+  interrompt toutes les taches du chat, y compris celles qui attendent leur tour.
 - **Fournisseur en panne.** Une cle expiree, un modele retire du catalogue ou un
   serveur local eteint ne coupent plus le service : le routeur bascule sur la
-  route suivante et met la route morte en quarantaine.
+  route suivante et met la route morte en quarantaine, plus longtemps si la
+  panne est structurelle (cle refusee) que passagere (debit depasse).
 - **Outil qui echoue.** L'erreur est rendue au modele sous forme de texte plutot
   que remontee en exception : il corrige au tour suivant au lieu de faire tomber
   la boucle.
+- **Reponse vide.** Un modele renvoie parfois ni texte ni appel d'outil. Le cas
+  est nomme explicitement plutot que de laisser un message blanc.
 - **Chemins.** Un chemin absolu ou une evasion par lien symbolique est refuse
   explicitement, jamais replie en silence dans le workspace.
 - **Reessais.** Dans python-telegram-bot, `BadRequest` derive de `NetworkError` ;
   rejouer aveuglement les erreurs reseau retardait donc de plusieurs secondes le
-  repli sur un envoi definitivement refuse.
+  repli sur un envoi definitivement refuse. A l'inverse, un envoi qui echoue
+  jusqu'au bout leve, au lieu de perdre le message en silence.
+
+Les deux modules dont une faille casse une conversation de facon definitive —
+le respect des invariants du protocole et le rendu Telegram — sont verifies par
+tirage aleatoire en plus des tests unitaires.
 
 ```bash
-make test    # 105 tests, sans acces reseau
+make test    # 126 tests, sans acces reseau
 make lint
 ```
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import shlex
 import sys
+import uuid
 from typing import Any
 
 from ..errors import ToolError
@@ -51,15 +52,21 @@ async def python(ctx: ToolContext, args: dict[str, Any]) -> str:
     code = str(args["code"])
     if not code.strip():
         raise ToolError("code vide.")
-    script = ctx.workspace / ".hermes_run.py"
+    # Nom unique : le modele emet souvent plusieurs appels dans le meme tour, et
+    # ils sont executes en parallele. Un nom fixe ferait executer a l'un le code
+    # de l'autre, sans que rien ne le signale.
+    script = ctx.workspace / f".hermes_{uuid.uuid4().hex}.py"
     script.write_text(code, encoding="utf-8")
     timeout = int(args.get("timeout") or ctx.exec_timeout)
-    return await run(
-        f"{shlex.quote(sys.executable)} {shlex.quote(script.name)}",
-        cwd=ctx.workspace,
-        timeout=max(1, min(timeout, 3600)),
-        output_limit=ctx.output_limit,
-    )
+    try:
+        return await run(
+            f"{shlex.quote(sys.executable)} {shlex.quote(script.name)}",
+            cwd=ctx.workspace,
+            timeout=max(1, min(timeout, 3600)),
+            output_limit=ctx.output_limit,
+        )
+    finally:
+        script.unlink(missing_ok=True)
 
 
 TOOLS = (shell, python)

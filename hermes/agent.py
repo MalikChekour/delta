@@ -88,7 +88,7 @@ class Agent:
                 messages.append(reply.assistant_message)
 
                 if not reply.tool_calls:
-                    run.text = reply.text
+                    run.text = reply.text.strip() or _reponse_vide(reply.finish_reason)
                     break
 
                 names = ", ".join(call.name for call in reply.tool_calls)
@@ -131,6 +131,23 @@ class Agent:
             return f"ERREUR : {exc}"
         log.info("outil %s(%s)", call.name, str(arguments)[:160])
         return await self.registry.dispatch(context, call.name, arguments)
+
+
+def _reponse_vide(finish_reason: str | None) -> str:
+    """Message affiche quand le modele ne renvoie ni texte ni appel d'outil.
+
+    Cela arrive : reponse tronquee, ou modele qui part en vrille. Sans ce
+    garde-fou, l'utilisateur ne verrait rien du tout et croirait a une panne.
+    """
+    if finish_reason == "length":
+        return (
+            "Ma reponse a ete coupee avant d'avoir commence : la limite de jetons est "
+            "atteinte. Augmente HERMES_MAX_TOKENS, ou demande quelque chose de plus court."
+        )
+    return (
+        "Le modele n'a rien renvoye. Reformule ta demande, ou change de modele "
+        "avec /model venice."
+    )
 
 
 def format_error(exc: BaseException) -> str:

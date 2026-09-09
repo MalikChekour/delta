@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+from collections import defaultdict
 from typing import Any
 
 from telegram import BotCommand, Update
@@ -31,7 +32,7 @@ from .agent import Agent, format_error
 from .config import Settings
 from .errors import ToolError
 from .memory import Store
-from .sandbox import resolve_in
+from .sandbox import disk_free, resolve_in
 from .tools import build_registry
 
 log = logging.getLogger(__name__)
@@ -78,10 +79,10 @@ async def send(message: Any, markdown: str) -> None:
         try:
             await _retrying(message.reply_text, part, parse_mode=ParseMode.HTML)
         except BadRequest as exc:
+            # Repli sur ce seul morceau : renvoyer tout le texte dupliquerait ce
+            # qui est deja parti.
             log.warning("HTML refuse par Telegram (%s) : repli en texte brut.", exc)
-            for raw in formatting.plain(text):
-                await _retrying(message.reply_text, raw)
-            return
+            await _retrying(message.reply_text, formatting.strip_tags(part))
 
 
 async def _retrying(func: Any, *args: Any, **kwargs: Any) -> Any:
@@ -92,20 +93,55 @@ async def _retrying(func: Any, *args: Any, **kwargs: Any) -> Any:
     rejoue quatre fois avec attente exponentielle avant de tomber en repli.
     """
     delay = 1.0
+    derniere: Exception | None = None
     for attempt in range(4):
         try:
             return await func(*args, **kwargs)
         except BadRequest:
             raise
         except RetryAfter as exc:
+            derniere = exc
             await asyncio.sleep(float(exc.retry_after) + 0.5)
         except (TimedOut, NetworkError) as exc:
+            derniere = exc
             if attempt == 3:
                 raise
             log.warning("Envoi Telegram en echec (%s), nouvelle tentative.", exc)
             await asyncio.sleep(delay)
             delay *= 2
-    return None
+    # Tentatives epuisees : on leve plutot que de renvoyer None, sans quoi le
+    # message serait perdu sans que personne ne le sache.
+    raise derniere or NetworkError("envoi impossible apres plusieurs tentatives")
+
+
+class Taches:
+    """Taches d'agent en cours, groupees par chat.
+
+    Les messages envoyes coup sur coup s'empilent derriere le verrou du chat :
+    il y a donc plusieurs taches vivantes a la fois, et /stop doit toutes les
+    liberer, pas seulement la derniere inscrite.
+    """
+
+    def __init__(self) -> None:
+        self._par_chat: dict[int, set[asyncio.Task[Any]]] = defaultdict(set)
+
+    def ajouter(self, chat_id: int, tache: asyncio.Task[Any]) -> None:
+        self._par_chat[chat_id].add(tache)
+
+    def retirer(self, chat_id: int, tache: asyncio.Task[Any]) -> None:
+        self._par_chat[chat_id].discard(tache)
+        if not self._par_chat[chat_id]:
+            self._par_chat.pop(chat_id, None)
+
+    def actives(self, chat_id: int) -> list[asyncio.Task[Any]]:
+        return [tache for tache in self._par_chat.get(chat_id, ()) if not tache.done()]
+
+    def interrompre(self, chat_id: int) -> int:
+        """Annule tout ce qui tourne pour ce chat. Renvoie le nombre annule."""
+        taches = self.actives(chat_id)
+        for tache in taches:
+            tache.cancel()
+        return len(taches)
 
 
 async def _quiet(coro: Any) -> None:
@@ -125,7 +161,7 @@ def build_application(settings: Settings) -> Application:
     )
     store = Store(settings.data_dir / "hermes.db")
     agent = Agent(settings, registry, store)
-    running: dict[int, asyncio.Task[Any]] = {}
+    taches = Taches()
 
     # La liste blanche du fichier .env, plus les proprietaires enregistres en base.
     owners: set[int] = set(settings.allowed_users) | store.owners()
@@ -256,13 +292,13 @@ def build_application(settings: Settings) -> Application:
         chat_id = update.effective_chat.id
         session = await store.load(chat_id)
         current = session.model or ", ".join(settings.model_chain)
-        busy = chat_id in running and not running[chat_id].done()
+        busy = bool(taches.actives(chat_id))
         await send(
             update.effective_message,
             f"Modele : `{current}`\n"
             f"{providers.describe(current.split(',')[0])}\n"
             f"Messages en memoire : {len(session.messages)}\n"
-            f"Workspace : `{settings.workspace}`\n"
+            f"Workspace : `{settings.workspace}` ({disk_free(settings.workspace)})\n"
             f"Outils : {len(registry)}\n"
             f"Tache en cours : {'oui' if busy else 'non'}",
         )
@@ -272,10 +308,9 @@ def build_application(settings: Settings) -> Application:
         await send(update.effective_message, "Historique efface.")
 
     async def cmd_stop(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
-        task = running.get(update.effective_chat.id)
-        if task and not task.done():
-            task.cancel()
-            await send(update.effective_message, "Tache interrompue.")
+        annulees = taches.interrompre(update.effective_chat.id)
+        if annulees:
+            await send(update.effective_message, f"{annulees} tache(s) interrompue(s).")
         else:
             await send(update.effective_message, "Rien en cours.")
 
@@ -308,6 +343,7 @@ def build_application(settings: Settings) -> Application:
             target = resolve_in(settings.workspace, name)
         except ToolError:
             target = settings.workspace / f"telegram_{source.file_unique_id}.bin"
+        target.parent.mkdir(parents=True, exist_ok=True)
         handle = await context.bot.get_file(source.file_id)
         await handle.download_to_drive(custom_path=str(target))
         await send(
@@ -329,15 +365,18 @@ def build_application(settings: Settings) -> Application:
         message = update.effective_message
         chat_id = update.effective_chat.id
 
-        previous = running.get(chat_id)
-        if previous and not previous.done():
+        if taches.actives(chat_id):
             await send(
                 message,
                 "Une tache tourne deja pour ce chat ; elle sera traitee d'abord. "
                 "Utilise /stop pour l'interrompre.",
             )
 
-        status = await _retrying(message.reply_text, "⏳ …")
+        # Le message d'attente est un confort : s'il echoue, on traite quand meme
+        # la demande plutot que de la perdre.
+        status = None
+        with contextlib.suppress(Exception):
+            status = await _retrying(message.reply_text, "⏳ …")
         typing = asyncio.create_task(_keep_typing(context, chat_id))
 
         async def progress(line: str) -> None:
@@ -345,10 +384,14 @@ def build_application(settings: Settings) -> Application:
                 await _quiet(status.edit_text(f"⚙️ {line}"))
 
         task = asyncio.create_task(agent.respond(chat_id, text, progress))
-        running[chat_id] = task
+        taches.ajouter(chat_id, task)
         try:
             run = await task
         except asyncio.CancelledError:
+            # Si c'est nous qu'on annule — arret du bot — la propagation doit se
+            # poursuivre ; seule une annulation demandee par /stop se rattrape.
+            if not task.cancelled():
+                raise
             if status is not None:
                 await _quiet(status.edit_text("⏹ Interrompu."))
             return
@@ -360,7 +403,7 @@ def build_application(settings: Settings) -> Application:
             return
         finally:
             typing.cancel()
-            running.pop(chat_id, None)
+            taches.retirer(chat_id, task)
 
         if status is not None:
             await _quiet(status.delete())

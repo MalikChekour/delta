@@ -8,7 +8,7 @@ qu'une panne obscure au premier message recu.
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -118,7 +118,6 @@ class Settings:
     enable_web: bool
     search_url: str
     log_level: str
-    env: dict[str, str] = field(default_factory=dict)
 
     @property
     def primary(self) -> str:

@@ -79,3 +79,26 @@ def test_json_lisible_en_base(tmp_path):
     with sqlite3.connect(s.path) as conn:
         raw = conn.execute("SELECT messages FROM conversations").fetchone()[0]
     assert json.loads(raw)[0]["content"] == "éàü"
+
+
+async def test_changement_de_modele_preserve_l_historique(tmp_path):
+    s = store(tmp_path)
+    await s.save(1, [{"role": "user", "content": "garde-moi"}], None)
+    await s.set_model(1, "venice")
+    session = await s.load(1)
+    assert session.model == "venice"
+    assert session.messages[0]["content"] == "garde-moi"
+
+
+async def test_changement_de_modele_sans_conversation_prealable(tmp_path):
+    s = store(tmp_path)
+    await s.set_model(5, "glm-4.7")
+    assert (await s.load(5)).model == "glm-4.7"
+
+
+async def test_changement_de_modele_ne_prend_pas_le_verrou(tmp_path):
+    """Un /model envoye pendant un tour long doit repondre tout de suite."""
+    s = store(tmp_path)
+    async with s.lock(1):
+        await asyncio.wait_for(s.set_model(1, "venice"), timeout=2)
+    assert (await s.load(1)).model == "venice"

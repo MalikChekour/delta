@@ -26,8 +26,13 @@ from .tools import Registry
 
 log = logging.getLogger(__name__)
 
-#: Duree pendant laquelle une route en echec est ecartee.
+#: Duree pendant laquelle une route en echec passager est ecartee (debit depasse,
+#: panne serveur). Assez pour ne pas insister, assez court pour revenir vite.
 QUARANTINE_SECONDS = 300
+
+#: Une panne structurelle — cle refusee, modele absent du catalogue — ne se
+#: resoudra pas d'elle-meme : inutile de la ressayer au meme rythme.
+QUARANTINE_PERMANENT = 3600
 
 
 @dataclass
@@ -182,16 +187,19 @@ class Client:
         message = choice.message
 
         calls: list[ToolCall] = []
+        vus: set[str] = set()
         for raw in getattr(message, "tool_calls", None) or []:
             function = getattr(raw, "function", None)
             if function is None or not getattr(function, "name", ""):
                 continue  # certains hebergeurs emettent des blocs vides
+            # Un identifiant absent ou repete casserait l'appariement appel /
+            # resultat : on le rend unique ici plutot que de le subir plus loin.
+            call_id = getattr(raw, "id", "") or f"call_{len(calls)}"
+            while call_id in vus:
+                call_id = f"{call_id}_{len(vus)}"
+            vus.add(call_id)
             calls.append(
-                ToolCall(
-                    id=getattr(raw, "id", "") or f"call_{len(calls)}",
-                    name=function.name,
-                    arguments=function.arguments or "{}",
-                )
+                ToolCall(id=call_id, name=function.name, arguments=function.arguments or "{}")
             )
 
         text = (message.content or "").strip()
@@ -277,14 +285,15 @@ class Router:
                 reply = await client.complete(system, messages, registry)
             except ProviderError as exc:
                 problems.append(str(exc))
-                self._quarantine[route] = time.monotonic() + QUARANTINE_SECONDS
-                log.warning("Route ecartee %s : %s", route, exc)
+                duree = QUARANTINE_SECONDS if exc.retryable else QUARANTINE_PERMANENT
+                self._quarantine[route] = time.monotonic() + duree
+                log.warning("Route ecartee %s pour %ds : %s", route, duree, exc)
                 continue
             except asyncio.CancelledError:
                 raise
             except Exception as exc:  # noqa: BLE001 - une route ne doit jamais tuer le tour
                 problems.append(f"{route} : {type(exc).__name__}: {exc}")
-                self._quarantine[route] = time.monotonic() + QUARANTINE_SECONDS
+                self._quarantine[route] = time.monotonic() + QUARANTINE_PERMANENT
                 log.exception("Route %s en erreur inattendue", route)
                 continue
 

@@ -75,9 +75,14 @@ class Store:
         self._save(chat_id, sanitize(messages), model)
 
     async def set_model(self, chat_id: int, model: str | None) -> None:
-        async with self.lock(chat_id):
-            session = await self.load(chat_id)
-            await self.save(chat_id, session.messages, model)
+        """Change le modele sans toucher a l'historique.
+
+        Ecrire la seule colonne concernee evite de prendre le verrou du chat :
+        sinon un /model envoye pendant un tour long resterait sans reponse
+        jusqu'a la fin de ce tour, et reecrirait par-dessus un historique
+        entre-temps perime.
+        """
+        await asyncio.to_thread(self._set_model, chat_id, model)
 
     async def clear(self, chat_id: int) -> None:
         async with self.lock(chat_id):
@@ -125,6 +130,19 @@ class Store:
             log.warning("Historique illisible pour le chat %s : reinitialise.", chat_id)
             messages = []
         return Session(chat_id, sanitize(messages), row[1])
+
+    def _set_model(self, chat_id: int, model: str | None) -> None:
+        with closing(self._connect()) as conn:
+            conn.execute(
+                """
+                INSERT INTO conversations (chat_id, messages, model, updated_at)
+                VALUES (?, '[]', ?, ?)
+                ON CONFLICT(chat_id) DO UPDATE SET
+                    model      = excluded.model,
+                    updated_at = excluded.updated_at
+                """,
+                (chat_id, model, datetime.now(timezone.utc).isoformat(timespec="seconds")),
+            )
 
     def _save(self, chat_id: int, messages: list[Message], model: str | None) -> None:
         with closing(self._connect()) as conn:

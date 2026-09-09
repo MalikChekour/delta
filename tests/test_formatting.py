@@ -5,21 +5,15 @@ from __future__ import annotations
 
 import re
 
-from hermes.formatting import CHUNK_LIMIT, chunks, plain
+from hermes.formatting import CHUNK_LIMIT, bien_formee, chunks, strip_tags
 
 BALISE = re.compile(r"</?(b|i|s|u|code|pre|a)\b[^>]*>")
 
 
 def balises_equilibrees(html: str) -> bool:
-    pile: list[str] = []
-    for match in BALISE.finditer(html):
-        nom = match.group(1)
-        if match.group(0).startswith("</"):
-            if not pile or pile.pop() != nom:
-                return False
-        else:
-            pile.append(nom)
-    return not pile
+    """Meme regle que Telegram : ni croisement, ni imbrication d'une balise
+    dans elle-meme."""
+    return bien_formee(html)
 
 
 def test_conversion_de_base():
@@ -68,5 +62,31 @@ def test_lien_markdown():
     assert '<a href="https://exemple.test/a?b=1&amp;c=2">ici</a>' in out
 
 
-def test_repli_texte_brut():
-    assert plain("abc", limit=2) == ["ab", "c"]
+def test_repli_sans_balise():
+    rendu = chunks("**gras** et `code`")[0]
+    assert strip_tags(rendu) == "gras et code"
+
+
+def test_repli_sans_balise_desechappe():
+    rendu = chunks("a < b & c")[0]
+    assert strip_tags(rendu) == "a < b & c"
+
+
+def test_balisage_entremele_ne_croise_pas_les_balises():
+    """Telegram refuse <s>a<i>b</s>c</i>. Les conversions gras/italique/barre
+    etant independantes, un balisage entremele en produisait."""
+    for texte in ["~~a *b~~ c*", "**a _b** c_", "# titre **gras**", "*a ~~b* c~~"]:
+        for part in chunks(texte):
+            assert bien_formee(part), texte
+
+
+def test_ligne_tordue_repliee_en_texte_nu():
+    rendu = chunks("~~a *b~~ c*")[0]
+    assert "<s>" not in rendu and "a" in rendu
+
+
+def test_detection_de_mauvaise_imbrication():
+    assert bien_formee("<b>a</b><i>b</i>")
+    assert not bien_formee("<s>a<i>b</s>c</i>")
+    assert not bien_formee("<b>a<b>b</b></b>")
+    assert not bien_formee("<b>a")
