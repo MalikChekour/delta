@@ -154,9 +154,33 @@ le respect des invariants du protocole et le rendu Telegram — sont verifies pa
 tirage aleatoire en plus des tests unitaires.
 
 ```bash
-make test    # 144 tests, sans acces reseau
+make test    # 163 tests, sans acces reseau
 make lint
 ```
+
+## Recherche web fiable
+
+La recherche essaie plusieurs moteurs et garde le premier qui repond. Scraper
+un seul moteur grand public est fragile : ils renvoient de plus en plus une
+page anti-robot au lieu de resultats. Hermes le detecte et bascule.
+
+En `auto` (defaut), l'ordre est : les moteurs a cle configures d'abord, puis
+DuckDuckGo Lite et HTML en secours sans cle.
+
+| Moteur | Configuration | Qualite |
+| --- | --- | --- |
+| Tavily | `TAVILY_API_KEY` | JSON propre, concu pour les agents — le meilleur |
+| Brave | `BRAVE_API_KEY` | JSON propre, jamais bloque |
+| SearXNG | `HERMES_SEARXNG_URL` | meta-moteur auto-hebergeable, sans cle |
+| DuckDuckGo | aucune | secours ; peut etre bloque par anti-robot |
+
+**Pour une recherche qui marche a coup sur, renseigne une de ces trois
+options** — c'est le principal levier. Sans cle, Hermes se rabat sur
+DuckDuckGo, qui fonctionne de facon intermittente selon le reseau. Ordre
+impose au besoin : `HERMES_SEARCH_BACKENDS=brave,searxng,ddg_lite`.
+
+Quand tous les moteurs echouent, `web_search` ne rend pas un silence : il dit
+lequel a echoue et quoi configurer.
 
 ## Ne jamais rester muet
 
@@ -232,6 +256,7 @@ hermes/
   tools/          shell, python, fichiers, web
   formatting.py   Markdown → HTML Telegram, decoupage sur
   health.py       battement et surveillance de la boucle de reception
+  tools/search.py recherche multi-moteurs avec repli
   bot.py          interface Telegram
   doctor.py       diagnostic
 ```

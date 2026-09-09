@@ -119,6 +119,8 @@ class Settings:
     enable_shell: bool
     enable_web: bool
     search_url: str
+    searxng_url: str
+    search_backends: tuple[str, ...]
     log_level: str
 
     @property
@@ -195,7 +197,9 @@ def load(*, require_telegram: bool = True) -> Settings:
         announce=_flag("HERMES_ANNOUNCE", True),
         enable_shell=_flag("HERMES_ENABLE_SHELL", True),
         enable_web=_flag("HERMES_ENABLE_WEB", True),
-        search_url=_env("HERMES_SEARCH_URL", "https://duckduckgo.com/html/"),
+        search_url=_env("HERMES_SEARCH_URL", "https://html.duckduckgo.com/html/"),
+        searxng_url=_env("HERMES_SEARXNG_URL"),
+        search_backends=_chain("HERMES_SEARCH_BACKENDS", ("auto",)),
         log_level=_env("HERMES_LOG_LEVEL", "INFO").upper(),
     )
     return settings

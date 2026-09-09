@@ -73,6 +73,8 @@ class Agent:
             output_limit=settings.output_limit,
             request_timeout=settings.request_timeout,
             search_url=settings.search_url,
+            searxng_url=settings.searxng_url,
+            search_backends=settings.search_backends,
             chat_id=chat_id,
         )
         run = Run()

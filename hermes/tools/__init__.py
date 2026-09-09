@@ -30,6 +30,8 @@ class ToolContext:
     output_limit: int
     request_timeout: int
     search_url: str
+    searxng_url: str = ""
+    search_backends: tuple[str, ...] = ("auto",)
     chat_id: int = 0
 
 

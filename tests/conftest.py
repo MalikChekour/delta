@@ -56,6 +56,8 @@ def settings(tmp_path: Path) -> Settings:
         enable_shell=True,
         enable_web=True,
         search_url="https://example.invalid/",
+        searxng_url="",
+        search_backends=("ddg_html",),
         log_level="WARNING",
     )
 

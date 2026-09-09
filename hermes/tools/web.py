@@ -1,8 +1,7 @@
-"""Recherche et lecture de pages web.
+"""Outils web : recherche (multi-moteurs) et lecture de page.
 
-La recherche passe par l'endpoint HTML de DuckDuckGo : pas de cle API, pas de
-quota, et une extraction stable. La lecture de page convertit le HTML en texte
-lisible sans dependance lourde.
+La logique de recherche vit dans ``search.py`` ; ce module l'expose comme outil
+et fournit ``fetch_url`` pour lire une page en texte lisible.
 """
 
 from __future__ import annotations
@@ -10,26 +9,16 @@ from __future__ import annotations
 import html as html_module
 import json
 import re
-import urllib.parse
 from typing import Any
 
 from ..errors import ToolError
 from ..sandbox import clip
 from . import ToolContext, tool
-
-USER_AGENT = (
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
-    "Chrome/124.0 Safari/537.36"
-)
+from .search import USER_AGENT, SearchConfig, search
 
 _SCRIPTS = re.compile(r"<(script|style|noscript|svg|head)[^>]*>.*?</\1>", re.S | re.I)
 _TAGS = re.compile(r"<[^>]+>")
 _BLANKS = re.compile(r"\n{3,}")
-_RESULT = re.compile(
-    r'<a[^>]+class="[^"]*result__a[^"]*"[^>]+href="(?P<href>[^"]+)"[^>]*>(?P<title>.*?)</a>'
-    r'(?:.*?<a[^>]+class="[^"]*result__snippet[^"]*"[^>]*>(?P<snippet>.*?)</a>)?',
-    re.S | re.I,
-)
 
 
 def _text(fragment: str) -> str:
@@ -42,34 +31,13 @@ def _text(fragment: str) -> str:
     return _BLANKS.sub("\n\n", fragment).strip()
 
 
-def _unwrap(href: str) -> str:
-    """DuckDuckGo enveloppe les liens dans /l/?uddg=... : on rend l'URL reelle."""
-    if "duckduckgo.com/l/" in href or href.startswith("/l/"):
-        query = urllib.parse.urlparse(href).query
-        target = urllib.parse.parse_qs(query).get("uddg")
-        if target:
-            return target[0]
-    if href.startswith("//"):
-        return "https:" + href
-    return href
-
-
-async def _fetch(
-    url: str, timeout: int, *, params: dict[str, str] | None = None
-) -> tuple[str, str]:
-    import httpx
-
-    try:
-        async with httpx.AsyncClient(
-            follow_redirects=True,
-            timeout=timeout,
-            headers={"User-Agent": USER_AGENT, "Accept-Language": "fr,en;q=0.8"},
-        ) as client:
-            response = await client.get(url, params=params)
-            response.raise_for_status()
-            return response.text, str(response.url)
-    except Exception as exc:  # noqa: BLE001 - httpx expose une dizaine de types
-        raise ToolError(f"requete vers {url} echouee : {type(exc).__name__}: {exc}") from exc
+def _config(ctx: ToolContext) -> SearchConfig:
+    return SearchConfig(
+        backends=ctx.search_backends,
+        searxng_url=ctx.searxng_url,
+        ddg_html_url=ctx.search_url,
+        timeout=ctx.request_timeout,
+    )
 
 
 @tool(
@@ -87,28 +55,17 @@ async def web_search(ctx: ToolContext, args: dict[str, Any]) -> str:
     if not query:
         raise ToolError("requete vide.")
     limit = max(1, min(int(args.get("limit") or 5), 15))
-    body, _ = await _fetch(ctx.search_url, ctx.request_timeout, params={"q": query})
 
-    results: list[str] = []
-    for match in _RESULT.finditer(body):
-        url = _unwrap(html_module.unescape(match.group("href")))
-        title = _text(match.group("title"))
-        snippet = _text(match.group("snippet") or "")
-        if not title or not url.startswith("http"):
-            continue
-        entry = f"{len(results) + 1}. {title}\n   {url}"
-        if snippet:
-            entry += f"\n   {snippet[:400]}"
-        results.append(entry)
-        if len(results) >= limit:
-            break
+    results, info = await search(query, limit, _config(ctx))
+    if results:
+        return "\n".join(r.render(i + 1) for i, r in enumerate(results))
 
-    if not results:
-        return (
-            f"Aucun resultat exploitable pour {query!r}. "
-            "Reformule, ou passe par fetch_url sur une source connue."
-        )
-    return "\n".join(results)
+    detail = f"\nDetail des moteurs : {info}" if info else ""
+    raise ToolError(
+        f"aucun resultat pour {query!r} sur les moteurs disponibles.{detail}\n"
+        "Pour une recherche fiable, renseigne une cle BRAVE_API_KEY ou TAVILY_API_KEY, "
+        "ou une instance HERMES_SEARXNG_URL. Sinon, tente fetch_url sur une source connue."
+    )
 
 
 @tool(
@@ -121,10 +78,22 @@ async def web_search(ctx: ToolContext, args: dict[str, Any]) -> str:
     ["url"],
 )
 async def fetch_url(ctx: ToolContext, args: dict[str, Any]) -> str:
+    import httpx
+
     url = str(args["url"]).strip()
     if not url.startswith(("http://", "https://")):
         raise ToolError("l'URL doit commencer par http:// ou https://.")
-    body, final = await _fetch(url, ctx.request_timeout)
+    try:
+        async with httpx.AsyncClient(
+            follow_redirects=True,
+            timeout=ctx.request_timeout,
+            headers={"User-Agent": USER_AGENT, "Accept-Language": "fr,en;q=0.8"},
+        ) as client:
+            response = await client.get(url)
+            response.raise_for_status()
+            body, final = response.text, str(response.url)
+    except Exception as exc:  # noqa: BLE001 - httpx expose une dizaine de types
+        raise ToolError(f"requete vers {url} echouee : {type(exc).__name__}: {exc}") from exc
 
     if args.get("raw"):
         content = body
