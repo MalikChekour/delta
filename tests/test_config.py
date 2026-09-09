@@ -88,3 +88,13 @@ def test_validation_des_modeles_sans_cle():
 def test_validation_des_modeles_avec_cle(monkeypatch):
     monkeypatch.setenv("VENICE_API_KEY", "x")
     config.load().validate_models()
+
+
+def test_messages_en_attente_traites_par_defaut():
+    """Les jeter donnerait un bot qui ignore une demande sans rien dire."""
+    assert config.load().drop_pending is False
+
+
+def test_messages_en_attente_ignorables(monkeypatch):
+    monkeypatch.setenv("HERMES_DROP_PENDING", "1")
+    assert config.load().drop_pending is True

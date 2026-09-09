@@ -160,7 +160,9 @@ def _split_long(line: str, limit: int) -> list[str]:
         line = line[cut:].lstrip()
     if line:
         pieces.append(line)
-    return pieces
+    # Une ligne vide separe deux paragraphes : la laisser tomber collerait tout
+    # le texte, et supprimerait les respirations a l'interieur des blocs de code.
+    return pieces or [line]
 
 
 def chunks(markdown: str, limit: int = CHUNK_LIMIT) -> list[str]:

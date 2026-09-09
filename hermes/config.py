@@ -114,6 +114,7 @@ class Settings:
     request_timeout: int
     custom_base_url: str
     claim_owner: bool
+    drop_pending: bool
     enable_shell: bool
     enable_web: bool
     search_url: str
@@ -189,6 +190,7 @@ def load(*, require_telegram: bool = True) -> Settings:
         request_timeout=_int("HERMES_REQUEST_TIMEOUT", 300),
         custom_base_url=_env("HERMES_CUSTOM_BASE_URL"),
         claim_owner=claim_owner,
+        drop_pending=_flag("HERMES_DROP_PENDING", False),
         enable_shell=_flag("HERMES_ENABLE_SHELL", True),
         enable_web=_flag("HERMES_ENABLE_WEB", True),
         search_url=_env("HERMES_SEARCH_URL", "https://duckduckgo.com/html/"),

@@ -474,6 +474,10 @@ def build_application(settings: Settings) -> Application:
 def run(settings: Settings) -> None:
     """Demarre le bot en long polling, jusqu'a interruption."""
     application = build_application(settings)
-    # drop_pending_updates : au redemarrage, on ignore la file accumulee plutot
-    # que de rejouer d'anciennes consignes hors contexte.
-    application.run_polling(drop_pending_updates=True, allowed_updates=Update.ALL_TYPES)
+    # Par defaut, les messages recus pendant un arret sont traites au redemarrage.
+    # Les jeter donnerait a l'utilisateur un bot qui ignore sa demande sans rien
+    # dire — le pire des symptomes. HERMES_DROP_PENDING=1 pour l'inverse, utile
+    # apres une longue interruption ou d'anciennes consignes n'ont plus de sens.
+    application.run_polling(
+        drop_pending_updates=settings.drop_pending, allowed_updates=Update.ALL_TYPES
+    )

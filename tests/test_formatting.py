@@ -90,3 +90,13 @@ def test_detection_de_mauvaise_imbrication():
     assert not bien_formee("<s>a<i>b</s>c</i>")
     assert not bien_formee("<b>a<b>b</b></b>")
     assert not bien_formee("<b>a")
+
+
+def test_lignes_vides_preservees():
+    """Sans elles, paragraphes et blocs de code se retrouvent colles."""
+    assert chunks("para un\n\npara deux")[0] == "para un\n\npara deux"
+
+
+def test_lignes_vides_preservees_dans_un_bloc_de_code():
+    rendu = chunks("```\nun\n\ndeux\n```")[0]
+    assert rendu == "<pre><code>un\n\ndeux</code></pre>"
