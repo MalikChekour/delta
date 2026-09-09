@@ -1,0 +1,26 @@
+# Installation :
+#   sudo cp deploy/hermes.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now hermes
+[Unit]
+Description=Hermes — agent Telegram
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=hermes
+WorkingDirectory=/opt/hermes
+EnvironmentFile=/opt/hermes/.env
+ExecStart=/opt/hermes/.venv/bin/hermes run
+Restart=always
+RestartSec=5
+
+# Durcissement : le service ecrit dans son workspace, nulle part ailleurs.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/hermes/workspace /opt/hermes/data
+
+[Install]
+WantedBy=multi-user.target
