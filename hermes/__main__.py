@@ -18,6 +18,22 @@ from . import __version__, config, doctor, health, providers
 from .errors import HermesError
 
 
+def _sortie_utf8() -> None:
+    """Rend la sortie capable d'ecrire des accents et des emoji.
+
+    🚨 SANS CECI, `hermes doctor` PLANTE. Sous Windows la console est en cp1252 : le premier
+    `✅` du compte rendu leve `UnicodeEncodeError` et **tue la commande de diagnostic** —
+    l'outil cense reveler les pannes etait lui-meme en panne (constate le 10/09). Le service,
+    lui, ecrit dans un fichier journal et n'etait pas touche : le defaut ne se voyait qu'en
+    ligne de commande, la ou on va justement chercher pourquoi quelque chose ne marche pas.
+    """
+    for flux in (sys.stdout, sys.stderr):
+        try:
+            flux.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:  # noqa: BLE001 - flux redirige ou deja configure
+            pass
+
+
 def _logging(level: str) -> None:
     logging.basicConfig(
         level=getattr(logging, level, logging.INFO),
@@ -120,6 +136,7 @@ def _cmd_chat(args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    _sortie_utf8()
     parser = argparse.ArgumentParser(prog="hermes", description="Agent Hermes")
     parser.add_argument("--version", action="version", version=__version__)
     sub = parser.add_subparsers(dest="command")

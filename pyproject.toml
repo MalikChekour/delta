@@ -12,6 +12,15 @@ dependencies = [
     "openai>=1.60",
     "httpx>=0.27",
     "python-dotenv>=1.0",
+    # Recherche web SANS CLE : `ddgs` atteint Bing, Yandex et Brave la ou nos propres
+    # scrapers recoltaient 403 et 429 (mesure du 2026-09-10). Elle est maintenue quand les
+    # moteurs changent leur balisage — ce qu'un scraper maison ne fait pas : le parseur
+    # ddg_lite de ce depot rendait zero resultat depuis un simple changement de guillemets.
+    "ddgs>=9.16",
+    # Extraction LOCALE du contenu principal d'une page. Sur l'article Wikipedia « Safran » :
+    # 52 k caracteres utiles contre 62 k de texte avec le decor par retrait de balises, et
+    # sans dependre d'un service tiers.
+    "trafilatura>=2.2",
 ]
 
 [project.optional-dependencies]

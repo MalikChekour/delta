@@ -8,6 +8,7 @@ import pytest
 
 from hermes.tools.search import (
     BACKENDS,
+    KEYLESS,
     Result,
     SearchConfig,
     _Blocked,
@@ -98,17 +99,31 @@ def test_tavily_json_met_la_reponse_en_tete():
 
 def test_auto_place_les_moteurs_avec_cle_en_tete(monkeypatch):
     monkeypatch.setenv("BRAVE_API_KEY", "x")
+    for var in ("TAVILY_API_KEY", "EXA_API_KEY"):
+        monkeypatch.delenv(var, raising=False)
     cfg = SearchConfig(backends=("auto",), searxng_url="https://s.test")
     ordre = resolve_backends(cfg)
     assert ordre[0] == "brave"
     assert "searxng" in ordre
-    assert ordre[-2:] == ["ddg_lite", "ddg_html"]  # keyless toujours en dernier
+    # Les moteurs sans cle ferment la marche, dans l'ordre declare par KEYLESS.
+    assert ordre[-len(KEYLESS):] == list(KEYLESS)
 
 
-def test_auto_sans_cle_ne_garde_que_le_scraping(monkeypatch):
-    for var in ("TAVILY_API_KEY", "BRAVE_API_KEY"):
+def test_auto_sans_cle_ne_garde_que_les_moteurs_libres(monkeypatch):
+    for var in ("TAVILY_API_KEY", "BRAVE_API_KEY", "EXA_API_KEY"):
         monkeypatch.delenv(var, raising=False)
-    assert resolve_backends(SearchConfig(backends=("auto",))) == ["ddg_lite", "ddg_html"]
+    assert resolve_backends(SearchConfig(backends=("auto",))) == list(KEYLESS)
+
+
+def test_ddg_html_passe_avant_ddg_lite():
+    """🚨 Mesure du 10/09 : `ddg_html` rend 9-10 resultats de facon stable la ou `ddg_lite`
+    est le premier a servir une page anti-robot. L'ordre n'est donc pas cosmetique."""
+    assert KEYLESS.index("ddg_html") < KEYLESS.index("ddg_lite")
+
+
+def test_les_moteurs_sans_cle_sont_tous_connus():
+    """Un nom mal orthographie dans KEYLESS disparaitrait en silence (BACKENDS.get -> None)."""
+    assert all(nom in BACKENDS for nom in KEYLESS)
 
 
 def test_liste_explicite_respectee():
@@ -252,3 +267,25 @@ async def test_backend_brave_saute_sans_cle(monkeypatch):
     monkeypatch.delenv("BRAVE_API_KEY", raising=False)
     with pytest.raises(_Skip):
         await _brave(ClientScriptable(), "q", 5, SearchConfig(backends=("brave",)))
+
+
+# -- moteurs sans cle ajoutes le 2026-09-10 ---------------------------------
+
+def test_ddgs_est_en_tete_des_moteurs_libres():
+    """🚨 `ddgs` est le seul a atteindre Bing, Yandex et Brave depuis cette machine ;
+    les scrapers maison y recoltaient 403 et 429. Il passe donc AVANT eux."""
+    assert KEYLESS[0] == "ddgs"
+    assert KEYLESS.index("ddgs") < KEYLESS.index("ddg_html")
+
+
+def test_les_scrapers_maison_restent_en_filet():
+    """Ils ne dependent d'aucun paquet : ils survivent a une desinstallation de `ddgs`."""
+    assert "ddg_html" in KEYLESS and "ddg_lite" in KEYLESS
+
+
+def test_ordre_ddgs_par_fiabilite_mesuree():
+    """Mesure du 10/09, 4 requetes par moteur : bing 4/4, yandex 3/4, brave 1/4, ddg 0/4."""
+    from hermes.tools.search import DDGS_MOTEURS
+
+    assert DDGS_MOTEURS[0] == "bing"
+    assert DDGS_MOTEURS.index("duckduckgo") == len(DDGS_MOTEURS) - 1

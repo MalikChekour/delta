@@ -209,9 +209,16 @@ MODELS: dict[str, ModelAlias] = {
             # Route verifiee : Venice heberge la variante Heretic, appels d'outils compris.
             _r("venice", "olafangensan-glm-4.7-flash-heretic"),
             _r("chutes", "p-e-w/GLM-4.7-Heretic"),
-            _r("openrouter", "p-e-w/glm-4.7-heretic"),
+            # 🚨 `openrouter:p-e-w/glm-4.7-heretic` RETIRE le 10/09 : verifie contre le
+            # catalogue OpenRouter, **zero modele « heretic » sur 436**. Ce n'etait pas une
+            # faute de frappe, le modele n'y est pas. Une route morte dans une cascade est
+            # pire qu'une route absente : elle donne l'illusion d'une redondance, et une
+            # cascade ne rattrape QUE les 429 et 5xx — un 404 la traverse (cf. la panne du
+            # bot muet). On la remplace par une route reelle vers le meme dernier recours,
+            # chez un AUTRE fournisseur : c'est ca, une redondance.
             # Dernier recours : le GLM-4.7 d'origine, meme famille, non decensure.
             _r("venice", "zai-org-glm-4.7"),
+            _r("openrouter", "z-ai/glm-4.7"),
         ),
     ),
     "venice": ModelAlias(

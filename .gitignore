@@ -21,3 +21,8 @@ venv/
 .mypy_cache/
 dist/
 build/
+
+# Sauvegardes locales du .env et caches de l'agent
+.env.bak.*
+workspace/.hermes_cache/
+workspace/.hermes_savoir/

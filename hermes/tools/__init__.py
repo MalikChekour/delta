@@ -128,10 +128,15 @@ class Registry:
 
 
 def build_registry(*, enable_shell: bool = True, enable_web: bool = True) -> Registry:
-    from . import files, shell, web
+    from . import code, files, savoir, shell, web
 
     registry = Registry()
     registry.add(*files.TOOLS)
+    # Memoire de connaissances : elle vit dans le workspace, comme les fichiers.
+    registry.add(*savoir.TOOLS)
+    # Les outils de code cherchent et modifient DANS le workspace, comme les outils de
+    # fichiers : ils suivent donc le meme interrupteur, pas celui du shell.
+    registry.add(*code.TOOLS)
     if enable_shell:
         registry.add(*shell.TOOLS)
     if enable_web:

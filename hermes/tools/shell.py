@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shlex
 import sys
 import uuid
@@ -38,6 +39,22 @@ async def shell(ctx: ToolContext, args: dict[str, Any]) -> str:
     )
 
 
+def _cite(chemin: str) -> str:
+    """Protege un chemin pour le shell COURANT.
+
+    🚨 `shlex.quote` est une fonction POSIX, et elle est activement nuisible sous Windows :
+    voyant les antislashs et les deux-points de `C:\\...\\python.exe`, elle entoure le chemin
+    d'APOSTROPHES SIMPLES — que `cmd.exe` ne reconnait pas. Il cherche alors un programme
+    litteralement nomme `'C:\\...` et rend « The filename, directory name, or volume label
+    syntax is incorrect ». Constate le 10/09 : l'outil `python` du bot etait mort depuis le
+    deploiement, alors que `shell` fonctionnait — meme famille que le `os.killpg` POSIX deja
+    corrige dans `sandbox.py`.
+    """
+    if os.name == "nt":
+        return '"%s"' % chemin
+    return shlex.quote(chemin)
+
+
 @tool(
     "python",
     "Execute un script Python dans le workspace, dans un processus separe. "
@@ -60,10 +77,16 @@ async def python(ctx: ToolContext, args: dict[str, Any]) -> str:
     timeout = int(args.get("timeout") or ctx.exec_timeout)
     try:
         return await run(
-            f"{shlex.quote(sys.executable)} {shlex.quote(script.name)}",
+            f"{_cite(sys.executable)} {_cite(script.name)}",
             cwd=ctx.workspace,
             timeout=max(1, min(timeout, 3600)),
             output_limit=ctx.output_limit,
+            # 🚨 SANS CECI, UN SEUL ACCENT TUE LE SCRIPT. Sous Windows la sortie standard
+            # d'un processus fils est en cp1252 : `print("éàü")` leve UnicodeEncodeError et
+            # le script meurt — code de retour 1, resultat perdu. Sur un bot qui parle
+            # FRANCAIS, c'est une panne quasi systematique. Verifie le 10/09 : « accents :
+            # éàü ✅ » plantait, passe avec PYTHONIOENCODING.
+            env={"PYTHONIOENCODING": "utf-8"},
         )
     finally:
         script.unlink(missing_ok=True)

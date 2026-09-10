@@ -70,6 +70,17 @@ async def run(
     cwd.mkdir(parents=True, exist_ok=True)
     environment = {**os.environ, "PYTHONUNBUFFERED": "1", **(env or {})}
 
+    # Isolation du groupe de processus, pour pouvoir tuer tout l'arbre au timeout.
+    # Les mecanismes different selon l'OS : setsid sur POSIX, groupe dedie sur
+    # Windows. Melanger les deux (killpg sur Windows) leve AttributeError.
+    spawn: dict[str, object] = {}
+    if os.name == "nt":
+        import subprocess
+
+        spawn["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+    else:
+        spawn["start_new_session"] = True
+
     try:
         process = await asyncio.create_subprocess_shell(
             command,
@@ -78,7 +89,7 @@ async def run(
             stderr=asyncio.subprocess.STDOUT,
             stdin=asyncio.subprocess.DEVNULL,
             env=environment,
-            start_new_session=True,  # permet de tuer tout l'arbre de processus
+            **spawn,
         )
     except OSError as exc:  # pragma: no cover - depend du systeme
         raise ToolError(f"Impossible de lancer la commande : {exc}") from exc
@@ -105,12 +116,24 @@ async def run(
 
 
 def _kill_tree(process: asyncio.subprocess.Process) -> None:
-    """Tue le groupe de processus : sinon les enfants survivent au timeout."""
+    """Tue le processus et toute sa descendance : sinon les enfants survivent."""
+    if os.name == "nt":
+        # taskkill /T descend l'arbre ; killpg n'existe pas sous Windows.
+        import subprocess
+
+        with contextlib.suppress(Exception):
+            subprocess.run(
+                ["taskkill", "/F", "/T", "/PID", str(process.pid)],
+                capture_output=True,
+                check=False,
+            )
+        return
+
     import signal
 
     try:
         os.killpg(os.getpgid(process.pid), signal.SIGKILL)
-    except OSError:
+    except (OSError, AttributeError):
         with contextlib.suppress(ProcessLookupError):
             process.kill()
 

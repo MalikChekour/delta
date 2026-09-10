@@ -114,8 +114,16 @@ def list_files(ctx: ToolContext, args: dict[str, Any]) -> str:
         relative = Path(current).relative_to(root)
         level = 0 if str(relative) == "." else len(relative.parts)
         dirs[:] = [] if level >= depth else sorted(d for d in dirs if not _ignore(d))
+        # 🚨 TOUJOURS DES BARRES OBLIQUES. Sous Windows, `Path("sous") / "f.txt"` s'affiche
+        # `sous\f.txt` : le modele recopie ce chemin dans l'appel suivant, et l'antislash y
+        # devient une sequence d'echappement (`\f` = saut de page) au moment ou la chaine
+        # JSON est relue. Le chemin arrive alors corrompu, sans que rien ne le signale.
+        # `/` fonctionne partout sous Windows et supprime le probleme a la source.
+        def _joli(nom: str) -> str:
+            return (str(relative / nom) if level else nom).replace(os.sep, "/")
+
         for name in dirs:
-            entries.append(f"{relative / name if level else name}/")
+            entries.append(_joli(name) + "/")
         for name in sorted(files):
             if _ignore(name):
                 continue
@@ -124,7 +132,7 @@ def list_files(ctx: ToolContext, args: dict[str, Any]) -> str:
                 size = path.stat().st_size
             except OSError:
                 continue  # disparu entre le parcours et la lecture
-            entries.append(f"{relative / name if level else name}  ({size} o)")
+            entries.append(f"{_joli(name)}  ({size} o)")
         if len(entries) >= 500:
             entries = entries[:500]
             entries.append("[... liste tronquee a 500 entrees]")
