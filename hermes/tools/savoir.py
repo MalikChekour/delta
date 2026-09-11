@@ -84,7 +84,15 @@ def retiens(ctx: ToolContext, args: dict[str, Any]) -> str:
         # 🚨 Un meme titre remplace la note existante plutot que d'en empiler une seconde :
         # sinon la memoire accumule des versions contradictoires du meme fait, et la
         # recherche rend les deux sans dire laquelle vaut.
-        ancienne = co.execute("SELECT id FROM notes WHERE titre = ?", (titre,)).fetchone()
+        ancienne = co.execute("SELECT id, contenu FROM notes WHERE titre = ?",
+                              (titre,)).fetchone()
+        # 🚨 DIRE QUE RIEN N'A CHANGE. Mesure du 11/09 : l'outil repondait « Note mise a
+        # jour » meme quand le contenu etait identique au caractere pres, et le modele,
+        # croyant avoir modifie quelque chose, rappelait `retiens` — SIX fois de suite.
+        # Un outil doit distinguer « j'ai agi » de « il n'y avait rien a faire ».
+        if ancienne and ancienne[1] == contenu:
+            return (f"Note deja enregistree a l'identique : « {titre} ». Rien a faire, "
+                    f"n'appelle plus cet outil pour ce fait.")
         champs = (titre, contenu, str(args.get("source") or ""),
                   str(args.get("etiquettes") or ""), time.time())
         if ancienne:

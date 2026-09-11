@@ -78,6 +78,14 @@ class Agent:
             chat_id=chat_id,
         )
         run = Run()
+        # 🚨 GARDE-BOUCLE. Mesure du 11/09 : sur « teneur en vitamine C du persil », l'agent
+        # trouvait la reponse en 3 etapes puis appelait `retiens` SIX FOIS de suite avec des
+        # arguments identiques — 6 etapes sur 9 gaspillees. Sur quatre executions de la meme
+        # tache : 3, 6, 7 et 20 etapes, la derniere epuisant la limite sans conclure.
+        # Le probleme n'est pas la competence, c'est la CONVERGENCE. Reexecuter un appel
+        # identique ne peut rien apprendre de neuf : on rend le resultat deja obtenu, et on
+        # le DIT au modele pour qu'il cesse et conclue.
+        deja: dict[tuple[str, str], tuple[int, str]] = {}
 
         try:
             for iteration in range(settings.max_tool_iterations):
@@ -102,8 +110,27 @@ class Agent:
                 # Les appels d'un meme tour sont independants : on les execute en
                 # parallele et on rend tous les resultats dans le meme lot.
                 outputs = await asyncio.gather(
-                    *(self._execute(context, call) for call in reply.tool_calls)
+                    *(self._execute(context, call, deja, iteration + 1)
+                      for call in reply.tool_calls)
                 )
+                # 🚨 AVERTIR AVANT LE MUR. Le garde-boucle ci-dessus n'attrape que les
+                # appels IDENTIQUES ; il ne peut rien contre une suite de recherches
+                # differentes mais steriles — mesure du 11/09 : « teneur en vitamine C »
+                # consommait encore les 20 tours en enchainant des requetes voisines.
+                # Sans cet avertissement, le modele decouvre la limite en la heurtant, et
+                # l'utilisateur recoit « j'ai atteint la limite » au lieu d'une reponse.
+                # 🚨 ET PAS AVANT D'AVOIR TRAVAILLE. Premiere version fautive, attrapee par
+                # `test_boucle_avec_outil` : avec un budget de 4 tours, `reste <= 3` etait
+                # vrai des le PREMIER appel — l'agent etait somme de conclure avant d'avoir
+                # commence. On n'avertit donc qu'une fois passe le gros du budget.
+                reste = settings.max_tool_iterations - iteration - 1
+                entame = (iteration + 1) >= settings.max_tool_iterations * 0.6
+                if 0 < reste <= 3 and entame and outputs:
+                    outputs[-1] += (
+                        f"\n\n[Il te reste {reste} tour(s) d'outils. Arrete de chercher : "
+                        f"conclus MAINTENANT avec ce que tu as deja, en disant ce qui est "
+                        f"etabli et ce qui ne l'est pas.]"
+                    )
                 for call, output in zip(reply.tool_calls, outputs, strict=True):
                     messages.append(llm.tool_result(call.id, output))
             else:
@@ -126,13 +153,37 @@ class Agent:
 
         return run
 
-    async def _execute(self, context: ToolContext, call: llm.ToolCall) -> str:
+    async def _execute(self, context: ToolContext, call: llm.ToolCall,
+                       deja: dict[tuple[str, str], tuple[int, str]] | None = None,
+                       tour: int = 0) -> str:
         try:
             arguments = call.parsed()
         except ValueError as exc:
             return f"ERREUR : {exc}"
+
+        if deja is not None:
+            import json as _json
+
+            cle = (call.name, _json.dumps(arguments, sort_keys=True, ensure_ascii=False))
+            vu = deja.get(cle)
+            if vu is not None:
+                precedent, resultat = vu
+                log.info("outil %s : appel IDENTIQUE au tour %d, non reexecute",
+                         call.name, precedent)
+                # 🚨 On ne se contente pas de rendre le meme resultat : on dit au modele
+                # qu'il se repete. Sans cette phrase, il relance le meme appel indefiniment
+                # — six fois d'affilee sur `retiens` lors de la mesure du 11/09.
+                return (
+                    f"[Appel IDENTIQUE deja effectue au tour {precedent} : non reexecute. "
+                    f"Le resultat est inchange, le refaire n'apprendra rien. Sers-toi de ce "
+                    f"qui suit et REPONDS.]\n{resultat}"
+                )
+
         log.info("outil %s(%s)", call.name, str(arguments)[:160])
-        return await self.registry.dispatch(context, call.name, arguments)
+        resultat = await self.registry.dispatch(context, call.name, arguments)
+        if deja is not None:
+            deja[cle] = (tour, resultat)
+        return resultat
 
 
 def _reponse_vide(finish_reason: str | None) -> str:
