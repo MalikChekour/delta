@@ -30,7 +30,19 @@ def _cache(ctx: ToolContext):
         try:
             from ..cache import CacheRecherche
 
-            _CACHES[cle] = CacheRecherche(ctx.workspace / ".hermes_cache" / "recherches.db")
+            c = CacheRecherche(ctx.workspace / ".hermes_cache" / "recherches.db")
+            # 🚨 `purge()` existait mais n'etait APPELEE NULLE PART : le cache grossissait
+            # indefiniment. On l'ecoule a la creation — une fois par workspace et par
+            # processus, donc a cout nul — en ne jetant que ce qui a plus d'une semaine.
+            try:
+                jetes = c.purge()
+                if jetes:
+                    import logging
+                    logging.getLogger(__name__).info(
+                        "cache de recherche : %d entree(s) perimee(s) retiree(s)", jetes)
+            except Exception:  # noqa: BLE001 - un menage rate ne doit rien bloquer
+                pass
+            _CACHES[cle] = c
         except Exception:  # noqa: BLE001
             _CACHES[cle] = None
     return _CACHES[cle]
