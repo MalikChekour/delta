@@ -193,9 +193,17 @@ def parse_tavily(payload: dict, limit: int) -> list[Result]:
     results: list[Result] = []
     answer = _clean(str(payload.get("answer") or ""))
     if answer:
-        results.append(
-            Result("Reponse directe (Tavily)", "https://tavily.com", answer)
-        )
+        # 🚨 CE N'EST PAS UNE SOURCE, C'EST UN RESUME. Tavily synthetise une reponse a
+        # partir des pages trouvees ; l'ancien libelle la presentait avec l'URL
+        # `https://tavily.com`, ce qui invite le modele a citer « Tavily » comme origine
+        # d'un chiffre. C'est exactement la fausse autorite que le prompt systeme
+        # interdit. On l'etiquette donc pour ce qu'elle est : une piste a verifier
+        # dans les resultats qui suivent.
+        results.append(Result(
+            "[RESUME AUTOMATIQUE — PAS UNE SOURCE, ne la cite pas : verifie dans les "
+            "resultats ci-dessous]",
+            "", answer,
+        ))
     for item in payload.get("results", []):
         url = str(item.get("url", ""))
         title = _clean(str(item.get("title", "")))

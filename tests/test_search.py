@@ -289,3 +289,19 @@ def test_ordre_ddgs_par_fiabilite_mesuree():
 
     assert DDGS_MOTEURS[0] == "bing"
     assert DDGS_MOTEURS.index("duckduckgo") == len(DDGS_MOTEURS) - 1
+
+
+def test_le_resume_tavily_est_signale_comme_non_citable():
+    """🚨 Tavily renvoie un `answer` SYNTHETISE a partir des pages trouvees. L'ancien
+    libelle le presentait avec l'URL `https://tavily.com` : le modele etait invite a citer
+    « Tavily » comme origine d'un chiffre, soit exactement la fausse autorite que le prompt
+    systeme interdit. Il doit etre etiquete pour ce qu'il est."""
+    payload = {"answer": "La reponse est 42.",
+               "results": [{"url": "https://src.test", "title": "Source", "content": "detail"}]}
+    out = parse_tavily(payload, 5)
+    resume = out[0]
+    assert "PAS UNE SOURCE" in resume.title
+    assert resume.url == "", "un resume ne doit porter AUCUNE URL citable"
+    assert "42" in resume.snippet
+    # la vraie source, elle, garde son URL
+    assert out[1].url == "https://src.test"
