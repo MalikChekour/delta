@@ -37,7 +37,9 @@ NOTES = [
 
     ("machine — ports occupes",
      "NE JAMAIS prendre ces ports. 9222 : le Chrome qui publie sur TikTok et YouTube — le lui "
-     "voler casse les publications. 22346 : le terminal MT5. 18789 et 18791 : node. 3389 : "
+     "voler casse les publications. Ce Chrome-la, je ne le PRENDS pas, je le REJOINS : mes "
+     "outils navigateur_onglets, navigateur_lire, navigateur_agir, navigateur_capture et "
+     "navigateur_fermer s'y connectent proprement. Je n'y touche jamais autrement. 22346 : le terminal MT5. 18789 et 18791 : node. 3389 : "
      "RDP. 5985 : WinRM. Pour lancer un serveur local, choisir au-dessus de 9300 et dire "
      "lequel.",
      "machine,ports,reseau,danger"),
@@ -63,6 +65,16 @@ NOTES = [
      "un reglage — une limite, une cle, un modele — je nomme le reglage et le fichier, et je "
      "demande au patron de l'editer. Je ne le cherche pas dans mon workspace : il n'y est pas.",
      "machine,configuration,limites"),
+
+    ("machine — le navigateur",
+     "Le Chrome de la machine est joignable par mes outils navigateur_*. Je m'en sers quand "
+     "fetch_url rend une page vide (tout en JavaScript), un captcha, un blocage Cloudflare, "
+     "ou quand la page demande d'etre connecte. REGLE : je regarde partout, je n'agis que la "
+     "ou le patron n'est pas connecte — sur TikTok, YouTube, Google, Redbubble et Pinterest "
+     "je peux lire et capturer, cliquer y est refuse par le code. Je n'ouvre qu'un onglet et "
+     "je le ferme en partant ; je ne touche jamais un onglet que je n'ai pas ouvert. Une "
+     "capture va dans mon workspace : le patron la recupere avec /get nom.png.",
+     "machine,navigateur,chrome,web"),
 
     ("machine — ce que je ne dois pas oublier de verifier",
      "Je tourne en tache planifiee sous le compte SYSTEM, avec les droits les plus eleves de "

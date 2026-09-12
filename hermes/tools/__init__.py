@@ -254,4 +254,10 @@ def build_registry(*, enable_shell: bool = True, enable_web: bool = True) -> Reg
         registry.add(*shell.TOOLS)
     if enable_web:
         registry.add(*web.TOOLS)
+        # Le navigateur suit l'interrupteur du web : c'est la meme capacite, en plus
+        # puissant. Playwright n'est importe qu'a l'usage, donc declarer ces outils ne
+        # coute rien et ne casse rien si la bibliotheque manque.
+        from . import navigateur
+
+        registry.add(*navigateur.TOOLS)
     return registry

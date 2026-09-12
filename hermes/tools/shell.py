@@ -80,6 +80,38 @@ def _arret_demande(bas: str) -> bool:
     return "wmic" in bas and ("delete" in bas or "terminate" in bas)
 
 
+#: Pilotage direct du navigateur : ce qui court-circuiterait les outils `navigateur_*`.
+_PILOTAGE = ("connect_over_cdp", "chromedevtools", "webdriver", "selenium", "puppeteer",
+             "playwright.sync_api", "playwright.async_api")
+#: Le port CDP seul ne suffit pas a accuser : `netstat | findstr :9222` est un diagnostic
+#: legitime. C'est le port ASSOCIE a un pilotage qui pose probleme.
+_INDICES_CDP = ("playwright", "cdp", "devtools", "websocket", "ws://", "chrome_debug_profile")
+
+
+def _pilotage_direct(bas: str) -> str | None:
+    """Refus si la commande pilote Chrome en contournant les outils `navigateur_*`.
+
+    🚨 SANS CECI, LES GARDES DU NAVIGATEUR NE VALENT RIEN. Les outils `navigateur_*` refusent
+    d'agir sur les sites ou le patron est connecte, et ne touchent jamais un onglet qu'ils
+    n'ont pas ouvert. Mais `shell` et `python` donnent acces a Playwright : trois lignes
+    suffisent a se connecter au port 9222, prendre l'onglet de TikTok Studio et cliquer. La
+    garde doit donc vivre au meme niveau que le trou.
+    """
+    pilote = any(mot in bas for mot in _PILOTAGE)
+    if not pilote and "9222" in bas:
+        pilote = any(mot in bas for mot in _INDICES_CDP)
+    if not pilote:
+        return None
+    return (
+        "commande refusee : elle pilote le navigateur directement, ce qui contourne les "
+        "garde-fous.\n"
+        "Ce Chrome porte les sessions TikTok et YouTube du patron ; un clic au mauvais "
+        "endroit publie un brouillon ou ferme la session.\n"
+        "Passe par mes outils : `navigateur_onglets`, `navigateur_lire`, "
+        "`navigateur_capture`, `navigateur_agir`, `navigateur_fermer`."
+    )
+
+
 #: Programmes qu'on protege AUSSI quand la commande vise un PID nu.
 #: `python.exe` en est volontairement absent : l'agent doit pouvoir arreter les processus
 #: qu'il a lui-meme lances, et ils sont en python. Il reste protege par son NOM — tuer
@@ -185,6 +217,9 @@ def _cible_protegee(commande: str, workspace=None) -> str | None:
     vraiment etanche serait de ne plus faire tourner l'agent sous le compte SYSTEM.
     """
     bas = commande.lower()
+    refus_pilotage = _pilotage_direct(bas)
+    if refus_pilotage:
+        return refus_pilotage
     # 🚨 LE TEST DU VERBE NE GOUVERNE QUE LES DEUX PREMIERES COUCHES. Premiere version : il
     # etait en tete de fonction, et `python tuer.py` — qui ne contient aucun verbe d'arret —
     # ressortait immediatement, sans que le script soit jamais relu. La troisieme couche
