@@ -1,0 +1,66 @@
+[
+ {
+  "nom": "calcul",
+  "famille": "raisonnement",
+  "ok": true,
+  "etapes": 1,
+  "secondes": 17.3,
+  "detail": "17*23+456/8 = 448"
+ },
+ {
+  "nom": "fait source",
+  "famille": "raisonnement",
+  "ok": true,
+  "etapes": 11,
+  "secondes": 66.3,
+  "detail": "chiffre sourcé"
+ },
+ {
+  "nom": "lecture page",
+  "famille": "raisonnement",
+  "ok": true,
+  "etapes": 1,
+  "secondes": 28.3,
+  "detail": "famille du curcuma"
+ },
+ {
+  "nom": "memoire",
+  "famille": "raisonnement",
+  "ok": true,
+  "etapes": 1,
+  "secondes": 22.2,
+  "detail": "fait retenu puis restitue"
+ },
+ {
+  "nom": "algorithme",
+  "famille": "codage",
+  "ok": true,
+  "etapes": 16,
+  "secondes": 84.7,
+  "detail": "JUSTE"
+ },
+ {
+  "nom": "debogage",
+  "famille": "codage",
+  "ok": true,
+  "etapes": 4,
+  "secondes": 41.4,
+  "detail": "JUSTE"
+ },
+ {
+  "nom": "renommage",
+  "famille": "codage",
+  "ok": true,
+  "etapes": 8,
+  "secondes": 40.2,
+  "detail": "120.0"
+ },
+ {
+  "nom": "test ecrit",
+  "famille": "codage",
+  "ok": true,
+  "etapes": 12,
+  "secondes": 78.5,
+  "detail": "le test ecrit ne passe pas"
+ }
+]
