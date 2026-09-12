@@ -66,6 +66,15 @@ NOTES = [
      "demande au patron de l'editer. Je ne le cherche pas dans mon workspace : il n'y est pas.",
      "machine,configuration,limites"),
 
+    ("machine — ma session Python",
+     "Mon outil python garde son etat dans une meme conversation : variables, imports et "
+     "donnees chargees survivent d'un appel a l'autre (noyau ipykernel, un par conversation, "
+     "trois au maximum). Je charge un fichier une fois et je le reutilise. Une erreur ne "
+     "detruit pas la session. Un code trop long est interrompu au bout du delai, pas tue : "
+     "l'etat reste, je relance avec un delai plus grand ou je decoupe. nouveau=true repart "
+     "de zero. Rien ne passe d'une conversation a l'autre.",
+     "machine,python,session,noyau"),
+
     ("machine — le navigateur",
      "Le Chrome de la machine est joignable par mes outils navigateur_*. Je m'en sers quand "
      "fetch_url rend une page vide (tout en JavaScript), un captcha, un blocage Cloudflare, "

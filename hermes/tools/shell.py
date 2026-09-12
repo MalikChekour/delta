@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 import shlex
@@ -10,7 +11,7 @@ import uuid
 from typing import Any
 
 from ..errors import ToolError
-from ..sandbox import run
+from ..sandbox import clip, run
 from . import ToolContext, tool
 
 
@@ -262,31 +263,18 @@ def _cite(chemin: str) -> str:
     return shlex.quote(chemin)
 
 
-@tool(
-    "python",
-    "Execute un script Python dans le workspace, dans un processus separe. "
-    "Utilise print() pour renvoyer un resultat.",
-    {
-        "code": {"type": "string", "description": "Code source Python complet."},
-        "timeout": {"type": "integer", "description": "Delai maximal en secondes."},
-    },
-    ["code"],
-)
-async def python(ctx: ToolContext, args: dict[str, Any]) -> str:
-    code = str(args["code"])
-    if not code.strip():
-        raise ToolError("code vide.")
-    # 🚨 Meme garde ici : `os.system("taskkill /IM chrome.exe")` dans un script Python
-    # contournerait entierement le filtre de l'outil shell.
-    refus = _cible_protegee(code)
-    if refus:
-        raise ToolError(refus)
+async def _python_isole(ctx: ToolContext, code: str, timeout: int) -> str:
+    """L'ancienne voie : un processus neuf, jete apres usage.
+
+    Gardee comme filet. Si le noyau persistant ne peut pas demarrer — bibliotheque absente,
+    port bloque, memoire pleine — l'outil `python` doit continuer a fonctionner comme avant.
+    Une amelioration qui casse la fonction de base serait une regression.
+    """
     # Nom unique : le modele emet souvent plusieurs appels dans le meme tour, et
     # ils sont executes en parallele. Un nom fixe ferait executer a l'un le code
     # de l'autre, sans que rien ne le signale.
     script = ctx.workspace / f".hermes_{uuid.uuid4().hex}.py"
     script.write_text(code, encoding="utf-8")
-    timeout = int(args.get("timeout") or ctx.exec_timeout)
     try:
         return await run(
             f"{_cite(sys.executable)} {_cite(script.name)}",
@@ -302,6 +290,45 @@ async def python(ctx: ToolContext, args: dict[str, Any]) -> str:
         )
     finally:
         script.unlink(missing_ok=True)
+
+
+@tool(
+    "python",
+    "Execute du code Python. LA SESSION RESTE OUVERTE d'un appel a l'autre dans une meme "
+    "conversation : les variables, les imports et les donnees chargees survivent. Charge un "
+    "fichier une fois, reutilise-le ensuite. Utilise print() pour montrer un resultat.",
+    {
+        "code": {"type": "string", "description": "Code source Python."},
+        "timeout": {"type": "integer", "description": "Delai maximal en secondes."},
+        "nouveau": {
+            "type": "boolean",
+            "description": "Repartir d'une session vierge, en oubliant tout ce qui a ete "
+                           "defini avant. A n'utiliser que si l'etat actuel gene.",
+        },
+    },
+    ["code"],
+)
+async def python(ctx: ToolContext, args: dict[str, Any]) -> str:
+    code = str(args["code"])
+    if not code.strip():
+        raise ToolError("code vide.")
+    # 🚨 Meme garde ici : `os.system("taskkill /IM chrome.exe")` dans un script Python
+    # contournerait entierement le filtre de l'outil shell.
+    refus = _cible_protegee(code)
+    if refus:
+        raise ToolError(refus)
+    timeout = max(1, min(int(args.get("timeout") or ctx.exec_timeout), 3600))
+    from . import noyau as _noyau
+
+    if _noyau.disponible():
+        try:
+            sortie = await _noyau.execute(ctx.workspace, ctx.chat_id, code, timeout,
+                                          bool(args.get("nouveau")))
+            return clip(sortie, ctx.output_limit)
+        except Exception as exc:  # noqa: BLE001
+            # Le noyau a refuse de demarrer : on le dit, et on execute quand meme.
+            logging.getLogger(__name__).warning("noyau persistant indisponible : %s", exc)
+    return await _python_isole(ctx, code, timeout)
 
 
 TOOLS = (shell, python)

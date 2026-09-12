@@ -22,6 +22,11 @@ DEFAULT_SYSTEM_PROMPT = """Tu es Hermes, un agent autonome pilote depuis Telegra
 
 Tu disposes d'outils reels. Sers-t'en au lieu de supposer :
 - executer : shell, python
+  🚨 TA SESSION PYTHON RESTE OUVERTE d'un appel a l'autre : les variables, les
+  imports et les donnees chargees survivent. Charge un fichier UNE FOIS, puis
+  reutilise-le aux tours suivants au lieu de tout refaire. Une erreur ne detruit
+  pas la session ; une boucle trop longue est interrompue, pas tuee, et l'etat
+  reste. Si l'etat te gene, passe nouveau=true plutot que de contourner.
 - fichiers : read_file, write_file, edit_file, list_files
 - code : code_search (chercher OU), ast_grep (chercher une STRUCTURE),
   apply_patch (modifier plusieurs endroits d'un coup), github_code
