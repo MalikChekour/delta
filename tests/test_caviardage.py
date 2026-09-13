@@ -107,3 +107,42 @@ def test_le_caviardage_n_est_pas_annonce_comme_etanche():
     from hermes.tools import secrets_connus as _sc
 
     assert "etanche" in (_sc.__doc__ or ""), "la limite doit rester ecrite dans le code"
+
+
+def test_un_secret_arrive_apres_coup_est_quand_meme_caviarde() -> None:
+    """🚨 FUITE REELLE, constatee le 13/09 lors d'une verification complete.
+
+    L'index des secrets etait construit au premier caviardage et jamais reconstruit, au
+    motif que « l'environnement d'un processus ne change pas en cours de route ». C'est
+    faux : `load_dotenv()` s'execute en differe, et plusieurs modules ne l'appellent qu'a
+    leur premier usage. Un index bati AVANT ce chargement ignorait le jeton Telegram, et
+    `echo <jeton>` le rendait en clair.
+    """
+    from hermes.tools import caviarde, oublie_les_secrets
+    import os
+
+    oublie_les_secrets()
+    caviarde("on amorce le cache avant que le secret n'existe")   # index bati sans lui
+
+    tardif = "tardif-9f3b2c7e1a5d4088bbee"
+    os.environ["CONTROLE_TARDIF_TOKEN"] = tardif
+    try:
+        sortie = caviarde(f"jeton={tardif}")
+        assert tardif not in sortie, "le secret arrive apres coup n'est pas caviarde"
+        assert "CONTROLE_TARDIF_TOKEN" in sortie
+    finally:
+        del os.environ["CONTROLE_TARDIF_TOKEN"]
+        oublie_les_secrets()
+
+
+def test_un_secret_retire_cesse_d_etre_caviarde() -> None:
+    """L'empreinte doit jouer dans les deux sens, sinon le cache grossit sans fin."""
+    from hermes.tools import caviarde, oublie_les_secrets
+    import os
+
+    valeur = "ephemere-5a7c9e2b4d6f8013aacc"
+    os.environ["CONTROLE_EPHEMERE_KEY"] = valeur
+    assert valeur not in caviarde(f"cle={valeur}")
+    del os.environ["CONTROLE_EPHEMERE_KEY"]
+    assert valeur in caviarde(f"cle={valeur}")
+    oublie_les_secrets()

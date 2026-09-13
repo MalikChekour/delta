@@ -122,30 +122,55 @@ def secrets_connus() -> dict[str, str]:
 
 
 _INDEX: dict[str, str] | None = None
+_SIGNATURE: tuple | None = None
+
+
+def _signature_env() -> tuple:
+    """Empreinte bon marche des variables susceptibles de porter un secret.
+
+    On ne relit que les NOMS et les LONGUEURS : pas d'encodage base64, pas de hex. C'est
+    l'operation qui coutait cher, et elle n'est refaite que si cette empreinte a bouge.
+    """
+    return tuple(sorted(
+        (nom, len(valeur or ""))
+        for nom, valeur in os.environ.items()
+        if len((valeur or "").strip()) >= _LONGUEUR_MINI
+        and any(mot in nom.upper() for mot in _MOTS_SECRETS)
+    ))
 
 
 def _index_tranches() -> dict[str, str]:
     """Index des tranches de `_LONGUEUR_MINI` caracteres de chaque secret, MIS EN CACHE.
 
-    Une seule correspondance suffit a declencher le caviardage, meme sans la valeur
-    entiere. L'environnement d'un processus ne change pas en cours de route : reconstruire
-    cet index a chaque sortie d'outil coutait 1,3 ms pour rien, sur des milliers d'appels.
-    `oublie_les_secrets()` le vide, pour les tests qui manipulent l'environnement.
+    Une seule correspondance suffit a declencher le caviardage, meme sans la valeur entiere.
+    Reconstruire cet index a chaque sortie d'outil coutait 1,3 ms pour rien, sur des milliers
+    d'appels — d'ou le cache.
+
+    🚨 MAIS LE CACHE SEUL FUYAIT. La premiere version supposait que « l'environnement d'un
+    processus ne change pas en cours de route ». C'est faux : `load_dotenv()` s'execute en
+    differe, et plusieurs modules l'appellent a leur premier usage seulement. Un index
+    construit AVANT ce chargement ne contenait pas le jeton Telegram, n'etait jamais
+    reconstruit, et le jeton ressortait en clair. Constate le 13/09 lors d'une verification
+    complete : `echo <jeton>` a rendu le jeton entier. On compare donc une empreinte de
+    l'environnement a chaque appel, et on reconstruit des qu'elle bouge.
     """
-    global _INDEX
-    if _INDEX is None:
+    global _INDEX, _SIGNATURE
+    signature = _signature_env()
+    if _INDEX is None or signature != _SIGNATURE:
         index: dict[str, str] = {}
         for valeur, nom in secrets_connus().items():
             for i in range(len(valeur) - _LONGUEUR_MINI + 1):
                 index.setdefault(valeur[i:i + _LONGUEUR_MINI], nom)
         _INDEX = index
+        _SIGNATURE = signature
     return _INDEX
 
 
 def oublie_les_secrets() -> None:
     """Vide le cache : a appeler apres toute modification de l'environnement."""
-    global _INDEX
+    global _INDEX, _SIGNATURE
     _INDEX = None
+    _SIGNATURE = None
 
 
 def caviarde(texte: str) -> str:

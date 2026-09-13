@@ -16,6 +16,7 @@ pas le bot : on interrompt, et l'etat reste.
 
 from __future__ import annotations
 
+import atexit
 import queue
 import re
 import time
@@ -289,3 +290,23 @@ async def arrete_tout() -> None:
 
 def combien() -> int:
     return len(_NOYAUX)
+
+
+def _menage_final() -> None:
+    """Ferme les canaux zmq AVANT le demontage de l'interpreteur.
+
+    Sans cela, les sockets sont ramasses apres que Python a vide les modules, et chaque
+    sortie de processus se termine par « TypeError: 'NoneType' object is not callable » dans
+    `zmq/_future.py`. C'est inoffensif, mais une trace inexpliquee dans un journal fait
+    perdre du temps le jour ou on y cherche une vraie panne — et elle noyait la sortie des
+    controles.
+    """
+    for noyau in list(_NOYAUX.values()):
+        try:
+            if noyau.kc is not None:
+                noyau.kc.stop_channels()
+        except Exception:  # noqa: BLE001 - on est en train de mourir, rien ne doit remonter
+            pass
+
+
+atexit.register(_menage_final)
