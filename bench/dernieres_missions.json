@@ -1,0 +1,66 @@
+[
+ {
+  "nom": "sources",
+  "famille": "recherche",
+  "ok": true,
+  "secondes": 55.4,
+  "detail": "",
+  "reponse": "Voici les deux sources avec leurs chiffres pour l'agglomération de Lagos :\n\n**Source 1 — Wikipedia (Lagos)**\n- Chiffre : 21 000 000 habitants (estimation)\n- Adresse : https://en.wikipedia.org/wiki/Lagos\n- Note : La page indique explicitement « Metro | 21,000,000 (estimated) »\n\n**Source 2 — UNEP (Nigeria)**\n- Chiffre : entre 18 et 20 millions habitants\n- Adresse : https://www.unep.org/nigeria-0\n- Note : La page indique « Lagos alone has an estimated population between 18 and 20 million »\n\n**Concordance :** Les deux chiffres **concordent**. Ils se situent tous les deux dans la fourchette de 18 à"
+ },
+ {
+  "nom": "luhn",
+  "famille": "code",
+  "ok": true,
+  "secondes": 27.7,
+  "detail": "",
+  "reponse": "4 tests passés (0.13s). Voici les fichiers créés :\n\n**siret.py** (41 lignes)\n- `valide(siret)` vérifie : longueur 14, tous les chiffres, somme Luhn %10 == 0\n- Algorithme Luhn : de droite à gauche, multiplier par 2 les chiffres de position paire (0-indexed), soustraire 9 si >9, additionner, vérifier %10 == 0\n\n**test_siret.py** (18 lignes)\n- test_siret_valide_1 : 73282932000074 → True\n- test_siret_valide_2 : 40483304800022 → True\n- test_siret_invalide_1 : 73282932000075 → False\n- test_siret_invalide_2 : '1234' → False"
+ },
+ {
+  "nom": "session",
+  "famille": "donnees",
+  "ok": true,
+  "secondes": 29.7,
+  "detail": "",
+  "reponse": "900\n900\n899\n899\n899\n899\n898\n898\n898\n898"
+ },
+ {
+  "nom": "page_js",
+  "famille": "navigateur",
+  "ok": true,
+  "secondes": 16.4,
+  "detail": "",
+  "reponse": "ORAGE-7741"
+ },
+ {
+  "nom": "voir",
+  "famille": "vision",
+  "ok": true,
+  "secondes": 10.6,
+  "detail": "",
+  "reponse": "La barre la plus haute est la barre **Sud**, de couleur **rouge**."
+ },
+ {
+  "nom": "ecouter",
+  "famille": "audio",
+  "ok": true,
+  "secondes": 26.6,
+  "detail": "",
+  "reponse": "Fichier `tournesol.txt` créé avec le mot « soleil » comme demandé."
+ },
+ {
+  "nom": "memoire",
+  "famille": "memoire",
+  "ok": true,
+  "secondes": 11.2,
+  "detail": "",
+  "reponse": "8814. Source : notes de la conversation (2026-09-13)."
+ },
+ {
+  "nom": "chaine",
+  "famille": "composite",
+  "ok": true,
+  "secondes": 27.4,
+  "detail": "",
+  "reponse": "La tendance monte. La courbe part d'environ 40 et atteint environ 230, avec des fluctuations mais une direction générale vers le haut."
+ }
+]

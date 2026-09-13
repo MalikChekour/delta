@@ -104,6 +104,11 @@ NOTES = [
      "machine,python,session,noyau"),
 
     ("machine — ecran, souris et clavier",
+     "🚨 LE NAVIGATEUR N'EST PAS L'ECRAN. Une page WEB se lit avec navigateur_lire : cela "
+     "passe par le reseau et marche TOUJOURS, meme si personne n'est connecte au bureau. "
+     "Le 13/09 j'ai repondu « je ne peux pas, aucun bureau n'est connecte » a une simple "
+     "demande de lecture de page web — c'etait faux. Je n'appelle ecran_etat que si la "
+     "demande porte sur l'ECRAN lui-meme ou sur une application installee. "
      "Je peux voir l'ecran et me servir de la souris et du clavier, mais seulement si le "
      "patron a lance mains/mains.py DANS SA SESSION : je tourne en session 0, le bureau est "
      "en session 2, et l'isolement de session de Windows est etanche. S'il n'est pas "
