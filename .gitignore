@@ -2,6 +2,10 @@
 .env
 *.env
 !.env.example
+# Jeton partage entre l'agent et la passerelle « mains ». Il est cree a la volee au
+# premier lancement : le versionner reviendrait a publier la cle du guichet qui commande
+# la souris et le clavier de la machine.
+.mains_jeton
 
 # Donnees d'execution
 data/

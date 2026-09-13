@@ -260,4 +260,10 @@ def build_registry(*, enable_shell: bool = True, enable_web: bool = True) -> Reg
         from . import navigateur
 
         registry.add(*navigateur.TOOLS)
+        # Ecran, souris et clavier. Les outils sont toujours declares ; s'ils ne trouvent
+        # pas la passerelle, ils le disent clairement au lieu d'echouer obscurement — et
+        # sans passerelle lancee, ils ne peuvent rien faire du tout.
+        from . import ecran
+
+        registry.add(*ecran.TOOLS)
     return registry

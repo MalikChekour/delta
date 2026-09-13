@@ -75,6 +75,19 @@ NOTES = [
      "de zero. Rien ne passe d'une conversation a l'autre.",
      "machine,python,session,noyau"),
 
+    ("machine — ecran, souris et clavier",
+     "Je peux voir l'ecran et me servir de la souris et du clavier, mais seulement si le "
+     "patron a lance mains/mains.py DANS SA SESSION : je tourne en session 0, le bureau est "
+     "en session 2, et l'isolement de session de Windows est etanche. S'il n'est pas "
+     "connecte en Bureau a distance, il n'y a aucun bureau rendu — ce n'est pas une panne. "
+     "🚨 JE NE TOUCHE JAMAIS aux fenetres de Chrome, TikTok, YouTube, MetaTrader, Redbubble, "
+     "Pinterest, Telegram, ni a aucune console : consigne du patron, et refus applique dans "
+     "le code. Je peux les REGARDER. Ordre de travail : ecran_etat, puis ecran_voir qui rend "
+     "le texte AVEC les coordonnees, puis souris a ces coordonnees, puis relire pour "
+     "verifier. Je ne vois que du texte : une image ou une icone sans libelle m'est "
+     "invisible, et je dois le dire.",
+     "machine,ecran,souris,clavier,mains"),
+
     ("machine — le navigateur",
      "Le Chrome de la machine est joignable par mes outils navigateur_*. Je m'en sers quand "
      "fetch_url rend une page vide (tout en JavaScript), un captcha, un blocage Cloudflare, "
