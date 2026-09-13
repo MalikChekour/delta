@@ -89,6 +89,37 @@ _PILOTAGE = ("connect_over_cdp", "chromedevtools", "webdriver", "selenium", "pup
 _INDICES_CDP = ("playwright", "cdp", "devtools", "websocket", "ws://", "chrome_debug_profile")
 
 
+#: Verbes qui signifient « ce programme va SE METTRE A ECOUTER sur ce port ».
+#: Les distinguer d'une simple interrogation compte : `curl http://127.0.0.1:9222/json` et
+#: `netstat | findstr :9222` sont des diagnostics legitimes et doivent passer.
+_ECOUTE = ("serve", "listen", "--port", "-p ", "bind", "--host")
+
+
+def _port_reserve(bas: str) -> str | None:
+    """Refus si la commande veut ECOUTER sur le port du Chrome de publication.
+
+    🚨 LE PIEGE D'OBSCURA. Le navigateur `obscura` installe dans le workspace ouvre son
+    serveur CDP sur le port **9222 par defaut** — exactement celui du Chrome qui publie sur
+    TikTok et YouTube. L'agent a redige une fiche entiere sur cet outil le 13/09 sans relever
+    le conflit, alors que la note machine le lui disait. Une consigne qu'on ne relie pas au
+    cas particulier ne protege de rien : il faut la barriere.
+    """
+    if "9222" in bas and any(verbe in bas for verbe in _ECOUTE):
+        return (
+            "commande refusee : elle ouvrirait un service sur le port 9222, celui du Chrome "
+            "qui publie sur TikTok et YouTube. Le lui prendre casse les publications.\n"
+            "Choisis un port au-dessus de 9300 et dis lequel."
+        )
+    # `obscura serve` sans port explicite prend 9222 en silence.
+    if "obscura" in bas and "serve" in bas and "--port" not in bas and "-p " not in bas:
+        return (
+            "commande refusee : `obscura serve` ecoute sur le port 9222 PAR DEFAUT, et ce "
+            "port est celui du Chrome qui publie sur TikTok et YouTube.\n"
+            "Relance avec un port explicite, par exemple : obscura serve --port 9310."
+        )
+    return None
+
+
 def _pilotage_direct(bas: str) -> str | None:
     """Refus si la commande pilote Chrome en contournant les outils `navigateur_*`.
 
@@ -218,6 +249,9 @@ def _cible_protegee(commande: str, workspace=None) -> str | None:
     vraiment etanche serait de ne plus faire tourner l'agent sous le compte SYSTEM.
     """
     bas = commande.lower()
+    refus_port = _port_reserve(bas)
+    if refus_port:
+        return refus_port
     refus_pilotage = _pilotage_direct(bas)
     if refus_pilotage:
         return refus_pilotage

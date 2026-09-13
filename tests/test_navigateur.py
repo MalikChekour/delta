@@ -210,3 +210,47 @@ def test_un_onglet_illisible_ne_bloque_pas() -> None:
     rétif, mien = PageRecalcitrante("x"), PageMarquee("abc")
     assert asyncio.run(_ramasse_mes_orphelins(FauxContexte([rétif, mien]))) == 1
     assert not rétif.ferme and mien.ferme
+
+
+# --------------------------------------------------------------------------- #
+# Le port 9222 ne se prend pas — le cas d'Obscura.
+# 🚨 Le navigateur `obscura` installe dans le workspace ouvre son serveur CDP sur le port
+# 9222 PAR DEFAUT : celui du Chrome qui publie sur TikTok et YouTube. L'agent a redige une
+# fiche entiere sur cet outil sans relever le conflit, alors que sa note machine le lui
+# disait. Une consigne qu'on ne relie pas au cas particulier ne protege de rien.
+# --------------------------------------------------------------------------- #
+
+ECOUTES_REFUSEES = [
+    "obscura serve",
+    "workspace/bin/obscura.exe serve",
+    "obscura serve --port 9222",
+    "obscura serve -p 9222",
+    "python -m http.server --port 9222",
+    "node serveur.js --port 9222",
+]
+
+
+@pytest.mark.parametrize("commande", ECOUTES_REFUSEES)
+def test_ecouter_sur_9222_est_refuse(commande: str) -> None:
+    from hermes.tools.shell import _cible_protegee
+    motif = _cible_protegee(commande)
+    assert motif is not None, commande
+    assert "9222" in motif
+    assert "9300" in motif or "9310" in motif        # on lui dit quoi faire a la place
+
+
+ECOUTES_PERMISES = [
+    "obscura serve --port 9310",
+    "obscura serve -p 9400",
+    "obscura fetch https://example.com",             # lire une page ne prend aucun port
+    "obscura scrape https://a.fr https://b.fr",
+    "curl http://127.0.0.1:9222/json/version",       # diagnostiquer reste permis
+    "netstat -ano | findstr :9222",
+    "python -m http.server --port 9310",
+]
+
+
+@pytest.mark.parametrize("commande", ECOUTES_PERMISES)
+def test_le_reste_passe(commande: str) -> None:
+    from hermes.tools.shell import _cible_protegee
+    assert _cible_protegee(commande) is None, commande

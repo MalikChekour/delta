@@ -59,12 +59,40 @@ NOTES = [
      "`rappelle` avant de chercher, et ne jamais relancer une requete identique.",
      "machine,reseau,recherche"),
 
-    ("machine — ma propre configuration",
-     "Mon fichier .env et mon code vivent dans C:\\Users\\Administrator\\agentmk06-bot, "
-     "AU-DESSUS de mon workspace : mes outils de fichier et de code les refusent. Pour changer "
-     "un reglage — une limite, une cle, un modele — je nomme le reglage et le fichier, et je "
-     "demande au patron de l'editer. Je ne le cherche pas dans mon workspace : il n'y est pas.",
-     "machine,configuration,limites"),
+    ("machine — mes reglages, noms exacts",
+     "🚨 NE JAMAIS DEVINER CES NOMS. Le 13/09, a qui me demandait d'augmenter ma limite de "
+     "tours d'outils, j'ai propose trois noms de variables — HERMES_MAX_TOOLS_ITERATIONS, "
+     "HERMES_MAX_TOOLS, HERMES_MAX_ITERATIONS — et aucun n'existait ; la vraie etait deja "
+     r"reglee. Les seuls noms reels, dans C:\Users\Administrator\agentmk06-bot\.env : "
+     "HERMES_MAX_TOOL_ITERATIONS (tours d'outils, au SINGULIER pour TOOL, valeur 60), "
+     "HERMES_MAX_TOKENS (8192), HERMES_EXEC_TIMEOUT (120 s), HERMES_REQUEST_TIMEOUT (300 s), "
+     "HERMES_OUTPUT_LIMIT (12000 caracteres), HERMES_HISTORY_MESSAGES (60). Je nomme la "
+     "variable exacte et sa valeur actuelle, ou je dis que je ne sais pas — je ne propose "
+     "pas trois candidats.",
+     "machine,configuration,reglages,limites"),
+
+    ("machine — obscura et le port 9222",
+     "Le navigateur obscura est installe dans bin/ de mon workspace (obscura.exe et "
+     "obscura-worker.exe, 158 Mo au total, pas 30). 🚨 SON PIEGE : `obscura serve` ecoute sur "
+     "le port 9222 PAR DEFAUT, celui du Chrome qui publie sur TikTok et YouTube. Le refus est "
+     "applique dans mon code. Pour un serveur CDP, toujours un port explicite. "
+     "`obscura fetch` et `obscura scrape` ne prennent aucun port et sont sans danger. "
+     r"🚨 LA COMMANDE EXACTE EST : bin\obscura.exe serve --port 9310 — avec un ANTISLASH et "
+     r"SANS ./ devant. Mesure du 13/09 : j'ai essaye ./bin/obscura.exe, puis invente un "
+     r"chemin C:\Users\patron\ qui n'existe pas, et brule sept appels dont un delai de 120 s "
+     "sur un Get-ChildItem recursif. cmd n'est pas un shell POSIX : ./ n'y veut rien dire.",
+     "machine,obscura,ports,navigateur,danger"),
+
+    ("machine — ou je vis sur le disque",
+     r"Mon workspace est C:\Users\Administrator\agentmk06-bot\workspace, et c'est le dossier "
+     r"courant de mes commandes : un chemin RELATIF y suffit toujours (bin\obscura.exe, "
+     r"pas C:\...\bin\obscura.exe, et surtout pas ./bin/). Je n'invente JAMAIS un chemin : "
+     r"le 13/09 j'ai ecrit C:\Users\patron\ — cet utilisateur n'existe pas. Si je ne sais pas "
+     "ou est un fichier, je le CHERCHE avec list_files, qui part de mon workspace. "
+     r"Mon .env et mon code vivent un cran au-dessus, dans C:\Users\Administrator\agentmk06-bot : "
+     "mes outils de fichier et de code les refusent, c'est normal. Pour changer un reglage, je "
+     "nomme la variable exacte (voir « mes reglages ») et je demande au patron de l'editer.",
+     "machine,configuration,chemins,workspace,limites"),
 
     ("machine — ma session Python",
      "Mon outil python garde son etat dans une meme conversation : variables, imports et "
