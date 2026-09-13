@@ -104,10 +104,16 @@ def guichet(monkeypatch):
     monkeypatch.setattr(M, "bouge", lambda x, y: None)
     monkeypatch.setattr(M, "_envoie", lambda entrees: etat["clics"].append(len(entrees)))
     monkeypatch.setattr(M, "capture", lambda zone=None: b"\x89PNG\r\n\x1a\nfaux")
+    etat["lignes"] = [{"texte": "Enregistrer", "x": 640, "y": 480}]
     monkeypatch.setattr(M, "lis_l_ecran", lambda zone=None, langue="fr-FR": {
         "langue": "fr-FR", "png": b"\x89PNG\r\n\x1a\nfaux",
-        "lignes": [{"texte": "Enregistrer", "x": 640, "y": 480}],
+        "lignes": list(etat["lignes"]),
     })
+    # Chaque test part d'une memoire vierge de l'ecran, sinon l'ordre des tests decide du
+    # resultat de la comparaison avant/apres.
+    import hermes.tools.ecran as _E
+    _E._DERNIERE_VUE["lignes"] = []
+    monkeypatch.setattr(_E, "_DELAI_REDESSIN", 0.01)    # pas d'attente reelle en test
     M.JETON = "jeton-de-test"
 
     port = port_libre()
@@ -289,3 +295,40 @@ def test_la_saisie_verifie_la_fenetre_ACTIVE(ctx, guichet, monkeypatch) -> None:
     sortie = outil(ctx, "clavier", {"texte": "publier"})
     assert "refuse" in sortie
     assert "chrome.exe" in sortie
+
+
+# --------------------------------------------------------------------------- #
+# Comprendre ce qu'on vient de faire.
+# 🚨 Un clic qui rate ressemble exactement a un clic qui reussit : meme retour, meme
+# silence. Sans comparaison avant/apres, l'agent enchaine sur une action sans effet et
+# la rapporte au patron comme un succes. C'est la difference entre agir et comprendre.
+# --------------------------------------------------------------------------- #
+
+def test_l_action_rend_compte_de_ce_qui_a_change(ctx, guichet) -> None:
+    outil(ctx, "ecran_voir")                                   # lecture de reference
+    guichet["lignes"] = [{"texte": "Document enregistre", "x": 300, "y": 200}]
+    sortie = outil(ctx, "souris", {"action": "clic", "x": 640, "y": 480})
+    assert "Ce qui a change" in sortie
+    assert "Document enregistre" in sortie                     # apparu
+    assert "Enregistrer" in sortie                             # disparu
+
+
+def test_une_action_sans_effet_est_signalee(ctx, guichet) -> None:
+    """Le cas le plus important : l'ecran est identique, donc le clic n'a rien fait."""
+    outil(ctx, "ecran_voir")
+    sortie = outil(ctx, "souris", {"action": "clic", "x": 640, "y": 480})
+    assert "RIEN N'A CHANGE" in sortie
+    assert "pas comme si elle avait reussi" in sortie
+
+
+def test_agir_sans_avoir_regarde_est_dit(ctx, guichet) -> None:
+    """Sans lecture prealable, il n'y a rien a comparer — et l'agent doit l'apprendre."""
+    sortie = outil(ctx, "souris", {"action": "clic", "x": 10, "y": 10})
+    assert "je n'avais pas lu l'ecran avant" in sortie
+
+
+def test_la_saisie_rend_compte_aussi(ctx, guichet) -> None:
+    outil(ctx, "ecran_voir")
+    guichet["lignes"] = [{"texte": "bonjour", "x": 100, "y": 100}]
+    sortie = outil(ctx, "clavier", {"texte": "bonjour"})
+    assert "Ce qui a change" in sortie

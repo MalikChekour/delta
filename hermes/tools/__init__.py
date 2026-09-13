@@ -241,7 +241,7 @@ class Registry:
 
 
 def build_registry(*, enable_shell: bool = True, enable_web: bool = True) -> Registry:
-    from . import code, files, savoir, shell, web
+    from . import code, files, oreille, savoir, shell, web
 
     registry = Registry()
     registry.add(*files.TOOLS)
@@ -250,6 +250,9 @@ def build_registry(*, enable_shell: bool = True, enable_web: bool = True) -> Reg
     # Les outils de code cherchent et modifient DANS le workspace, comme les outils de
     # fichiers : ils suivent donc le meme interrupteur, pas celui du shell.
     registry.add(*code.TOOLS)
+    # Les oreilles transcrivent EN LOCAL un fichier du workspace : elles suivent donc les
+    # outils de fichier, pas ceux du reseau. Elles marchent meme sans internet.
+    registry.add(*oreille.TOOLS)
     if enable_shell:
         registry.add(*shell.TOOLS)
     if enable_web:
@@ -266,4 +269,8 @@ def build_registry(*, enable_shell: bool = True, enable_web: bool = True) -> Reg
         from . import ecran
 
         registry.add(*ecran.TOOLS)
+        # Les yeux passent par un modele distant : sans reseau, ils ne voient rien.
+        from . import vision
+
+        registry.add(*vision.TOOLS)
     return registry

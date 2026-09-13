@@ -4,15 +4,15 @@
   "famille": "raisonnement",
   "ok": true,
   "etapes": 1,
-  "secondes": 24.9,
+  "secondes": 22.4,
   "detail": "17*23+456/8 = 448"
  },
  {
   "nom": "fait source",
   "famille": "raisonnement",
   "ok": true,
-  "etapes": 4,
-  "secondes": 50.3,
+  "etapes": 6,
+  "secondes": 54.0,
   "detail": "chiffre sourcé"
  },
  {
@@ -20,7 +20,7 @@
   "famille": "raisonnement",
   "ok": true,
   "etapes": 1,
-  "secondes": 22.2,
+  "secondes": 30.0,
   "detail": "famille du curcuma"
  },
  {
@@ -28,7 +28,7 @@
   "famille": "raisonnement",
   "ok": true,
   "etapes": 1,
-  "secondes": 17.8,
+  "secondes": 17.4,
   "detail": "fait retenu puis restitue"
  },
  {
@@ -36,31 +36,31 @@
   "famille": "codage",
   "ok": true,
   "etapes": 3,
-  "secondes": 31.2,
+  "secondes": 33.7,
   "detail": "JUSTE"
  },
  {
   "nom": "debogage",
   "famille": "codage",
   "ok": true,
-  "etapes": 16,
-  "secondes": 74.2,
+  "etapes": 4,
+  "secondes": 38.3,
   "detail": "JUSTE"
  },
  {
   "nom": "renommage",
   "famille": "codage",
   "ok": true,
-  "etapes": 8,
-  "secondes": 38.3,
+  "etapes": 9,
+  "secondes": 42.4,
   "detail": "120.0"
  },
  {
   "nom": "test ecrit",
   "famille": "codage",
-  "ok": false,
-  "etapes": 13,
-  "secondes": 63.4,
-  "detail": "RATES:bogue NON corrige"
+  "ok": true,
+  "etapes": 15,
+  "secondes": 87.7,
+  "detail": "le test ecrit ne passe pas"
  }
 ]

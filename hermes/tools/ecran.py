@@ -45,6 +45,51 @@ _ENDORMI = (
 )
 
 
+#: Derniere lecture de l'ecran, pour savoir ce qu'une action a CHANGE.
+#: 🚨 C'est ce qui fait la difference entre agir et comprendre ce qu'on fait. Un clic qui
+#: rate ressemble exactement a un clic qui reussit : meme retour, meme silence. Sans
+#: comparaison avant/apres, l'agent enchaine sur une action qui n'a rien produit, et il le
+#: rapporte au patron comme un succes.
+_DERNIERE_VUE: dict[str, Any] = {"lignes": []}
+
+#: Le temps qu'une fenetre se redessine apres un clic. En dessous, on relit l'ecran d'avant
+#: et on conclut « rien n'a change » a tort.
+_DELAI_REDESSIN = 0.8
+
+
+def _resume(lignes: list) -> set:
+    return {l.get("texte", "").strip() for l in lignes if l.get("texte", "").strip()}
+
+
+async def _qu_est_ce_qui_a_change() -> str:
+    """Relit l'ecran et decrit l'ecart avec la lecture precedente."""
+    import asyncio
+
+    await asyncio.sleep(_DELAI_REDESSIN)
+    avant = _resume(_DERNIERE_VUE.get("lignes") or [])
+    try:
+        lu = (await _appel("/lire", {}, delai=60)).json()
+    except ToolError as exc:
+        return f"\n(je n'ai pas pu relire l'ecran pour verifier : {exc})"
+    apres = _resume(lu.get("lignes") or [])
+    _DERNIERE_VUE["lignes"] = lu.get("lignes") or []
+    if not avant:
+        return ("\n(je n'avais pas lu l'ecran avant d'agir : je ne peux pas dire ce qui a "
+                "change. Lis l'ecran AVANT d'agir la prochaine fois.)")
+    apparu = sorted(apres - avant)[:6]
+    disparu = sorted(avant - apres)[:6]
+    if not apparu and not disparu:
+        return ("\n🚨 RIEN N'A CHANGE a l'ecran. L'action n'a probablement eu aucun effet : "
+                "mauvaise position, fenetre inactive, ou element non cliquable. Ne continue "
+                "pas comme si elle avait reussi.")
+    morceaux = []
+    if apparu:
+        morceaux.append("apparu : " + " | ".join(apparu))
+    if disparu:
+        morceaux.append("disparu : " + " | ".join(disparu))
+    return "\nCe qui a change a l'ecran — " + " ; ".join(morceaux)
+
+
 def _jeton() -> str:
     try:
         return JETON_FICHIER.read_text(encoding="utf-8").strip()
@@ -120,6 +165,7 @@ async def ecran_voir(ctx: ToolContext, args: dict[str, Any]) -> str:
         f"[{fenetre.get('programme') or '?'}]",
     ]
     lignes = lu.get("lignes") or []
+    _DERNIERE_VUE["lignes"] = lignes          # reference pour le "qu'est-ce qui a change"
     if not lignes:
         entete.append("Aucun texte lisible a l'ecran (image, video, ou ecran vide).")
     else:
@@ -158,9 +204,10 @@ async def souris(ctx: ToolContext, args: dict[str, Any]) -> str:
     else:
         raise ToolError("action inconnue : attendu clic, bouge ou defile.")
     resultat = (await _appel("/souris", charge)).json()
+    ecart = await _qu_est_ce_qui_a_change() if action in ("clic", "defile") else ""
     fenetre = resultat.get("fenetre") or {}
     ou = f" dans « {fenetre.get('titre') or fenetre.get('programme') or '?'} »" if fenetre else ""
-    return f"{resultat.get('fait', action)} fait{ou}. Relis l'ecran pour verifier."
+    return f"{resultat.get('fait', action)} fait{ou}.{ecart}"
 
 
 @tool(
@@ -183,10 +230,11 @@ async def clavier(ctx: ToolContext, args: dict[str, Any]) -> str:
         raise ToolError("donne `texte` a saisir, ou `touche` a presser.")
     charge = {"texte": str(texte)} if texte is not None else {"touche": str(touche)}
     resultat = (await _appel("/clavier", charge)).json()
+    ecart = await _qu_est_ce_qui_a_change()
     fenetre = resultat.get("fenetre") or {}
     ou = f" dans « {fenetre.get('titre') or fenetre.get('programme') or '?'} »" if fenetre else ""
     quoi = f"texte saisi ({len(str(texte))} caracteres)" if texte is not None else f"touche {touche}"
-    return f"{quoi}{ou}. Relis l'ecran pour verifier."
+    return f"{quoi}{ou}.{ecart}"
 
 
 @tool(

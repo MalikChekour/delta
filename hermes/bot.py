@@ -408,6 +408,35 @@ def build_application(settings: Settings, panne: dict[str, bool] | None = None) 
         if message.caption:
             await _handle_text(update, context, message.caption)
 
+    async def on_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Un message vocal : on l'ecoute, puis on le traite comme s'il avait ete ecrit.
+
+        🚨 La transcription est RENVOYEE AU PATRON avant d'agir. Whisper se trompe parfois
+        d'un mot, et un mot change la consigne : mesure du 13/09, « les CINQ produits »
+        devenait « les SAINS produits ». S'il voit ce que le bot a compris, il peut corriger
+        tout de suite au lieu de decouvrir le malentendu dans le resultat.
+        """
+        message = update.effective_message
+        source = message.voice or message.audio or message.video_note
+        if source is None:
+            return
+        cible = settings.workspace / f"vocal_{source.file_unique_id}.ogg"
+        cible.parent.mkdir(parents=True, exist_ok=True)
+        poignee = await context.bot.get_file(source.file_id)
+        await poignee.download_to_drive(custom_path=str(cible))
+        try:
+            from .tools.oreille import _transcris
+
+            texte, _langue, duree = await asyncio.to_thread(_transcris, cible, None)
+        except Exception as exc:  # noqa: BLE001
+            await send(message, f"Je n'ai pas pu ecouter ce message : {exc}")
+            return
+        if not texte:
+            await send(message, "Je n'ai entendu aucune parole dans ce message.")
+            return
+        await send(message, f"🎧 J'ai entendu ({duree:.0f} s) :\n« {texte} »")
+        await _handle_text(update, context, texte)
+
     async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         text = (update.effective_message.text or "").strip()
         if text:
@@ -505,6 +534,10 @@ def build_application(settings: Settings, panne: dict[str, bool] | None = None) 
     application.add_handler(CommandHandler("reset", guarded(cmd_reset)))
     application.add_handler(CommandHandler("stop", guarded(cmd_stop)))
     application.add_handler(CommandHandler("get", guarded(cmd_get)))
+    application.add_handler(
+        MessageHandler(filters.VOICE | filters.AUDIO | filters.VIDEO_NOTE,
+                       guarded(on_voice))
+    )
     application.add_handler(
         MessageHandler(filters.Document.ALL | filters.PHOTO, guarded(on_document))
     )

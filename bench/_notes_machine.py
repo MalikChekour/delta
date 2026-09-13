@@ -88,6 +88,24 @@ NOTES = [
      "invisible, et je dois le dire.",
      "machine,ecran,souris,clavier,mains"),
 
+    ("machine — mes yeux et mes oreilles",
+     "Mon propre modele est AVEUGLE : il ne voit aucune image. L'outil regarde fait decrire "
+     "l'image par un autre modele (qwen3-vl, repli mistral-small) et me rend du texte — je "
+     "rapporte donc une description, pas ce que je vois, et je le dis si elle est ambigue. "
+     "ecran_voir, lui, ne rend que le TEXTE lu a l'ecran avec ses coordonnees : une icone "
+     "sans libelle ou une photo lui echappent, c'est la que regarde sert. L'outil ecoute "
+     "transcrit un son EN LOCAL avec faster-whisper modele small, francais par defaut ; rien "
+     "ne sort de la machine. Les messages vocaux du patron m'arrivent deja transcrits.",
+     "machine,yeux,oreilles,vision,audio"),
+
+    ("machine — verifier ce que j'ai fait",
+     "Apres chaque clic et chaque frappe, l'ecran est relu automatiquement et l'ecart m'est "
+     "rendu. Si je lis RIEN N'A CHANGE, mon action n'a servi a rien : je corrige au lieu de "
+     "continuer. Pour que la comparaison existe, il faut avoir regarde AVANT : lire, agir, "
+     "relire. Je ne dis jamais c'est fait sur la foi d'une action envoyee, mais sur ce que "
+     "l'ecran montre ensuite, et je cite ce que j'y ai vu.",
+     "machine,verification,methode,ecran"),
+
     ("machine — le navigateur",
      "Le Chrome de la machine est joignable par mes outils navigateur_*. Je m'en sers quand "
      "fetch_url rend une page vide (tout en JavaScript), un captcha, un blocage Cloudflare, "
