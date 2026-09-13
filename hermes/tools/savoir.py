@@ -27,6 +27,7 @@ from typing import Any
 from ..errors import ToolError
 from ..sandbox import clip
 from . import ToolContext, tool
+from . import coffre
 
 _BASES: dict[str, Path] = {}
 
@@ -79,6 +80,15 @@ def retiens(ctx: ToolContext, args: dict[str, Any]) -> str:
     contenu = str(args["contenu"]).strip()
     if not contenu:
         raise ToolError("contenu vide : il n'y a rien a retenir.")
+    # 🚨 FUITE REELLE, TROUVEE LE 13/09 EN OUVRANT LE COFFRE. Le caviardage protegeait ce que
+    # les outils RENVOIENT ; il ne voyait pas ce que l'agent ECRIT dans sa propre memoire.
+    # L'agent avait lu le .env avec `shell`, puis range le resultat dans une note intitulee
+    # « Configuration .env workspace » — jeton GitHub et cle Tavily en clair, sur le disque,
+    # destines a etre relus et recites indefiniment. Une memoire est le pire endroit ou
+    # laisser un secret : c'est fait pour ressortir.
+    from . import caviarde
+
+    titre, contenu = caviarde(titre), caviarde(contenu)
     co = _base(ctx)
     try:
         # 🚨 Un meme titre remplace la note existante plutot que d'en empiler une seconde :
@@ -93,7 +103,7 @@ def retiens(ctx: ToolContext, args: dict[str, Any]) -> str:
         if ancienne and ancienne[1] == contenu:
             return (f"Note deja enregistree a l'identique : « {titre} ». Rien a faire, "
                     f"n'appelle plus cet outil pour ce fait.")
-        champs = (titre, contenu, str(args.get("source") or ""),
+        champs = (titre, contenu, caviarde(str(args.get("source") or "")),
                   str(args.get("etiquettes") or ""), time.time())
         if ancienne:
             co.execute("UPDATE notes SET titre=?,contenu=?,source=?,etiquettes=?,pose=? "
@@ -104,8 +114,17 @@ def retiens(ctx: ToolContext, args: dict[str, Any]) -> str:
                        "VALUES (?,?,?,?,?)", champs)
             verbe = "enregistree"
         co.commit()
+        # Le fichier Markdown est la version qui fait foi : la base n'est qu'un index.
+        coffre.ecris(ctx.workspace, titre, contenu, caviarde(str(args.get("source") or "")),
+                     str(args.get("etiquettes") or ""))
         total = co.execute("SELECT COUNT(*) FROM notes").fetchone()[0]
-        return f"Note {verbe} : « {titre} ». La memoire compte {total} note(s)."
+        manques = [c for c in coffre.liens_sortants(contenu)
+                   if coffre.trouve(ctx.workspace, c) is None]
+        # Dire tout de suite qu'un lien pointe dans le vide : c'est une invitation a ecrire
+        # la note manquante, pas une erreur. Obsidian les affiche en pointille.
+        avis = ("\nLiens vers des notes qui n'existent pas encore : "
+                + ", ".join("[[%s]]" % m for m in manques)) if manques else ""
+        return (f"Note {verbe} : « {titre} ». La memoire compte {total} note(s)." + avis)
     finally:
         co.close()
 
@@ -124,6 +143,7 @@ def rappelle(ctx: ToolContext, args: dict[str, Any]) -> str:
     limite = max(1, min(int(args.get("limite") or 5), 25))
     co = _base(ctx)
     try:
+        _accorde(ctx, co)          # les corrections faites dans Obsidian passent d'abord
         if not requete:
             lignes = co.execute(
                 "SELECT titre,contenu,source,pose FROM notes ORDER BY pose DESC LIMIT ?",
@@ -171,11 +191,118 @@ def oublie(ctx: ToolContext, args: dict[str, Any]) -> str:
     try:
         cur = co.execute("DELETE FROM notes WHERE titre = ?", (str(args["titre"]).strip(),))
         co.commit()
-        if not cur.rowcount:
+        efface = coffre.supprime(ctx.workspace, str(args["titre"]).strip())
+        if not cur.rowcount and not efface:
             return "aucune note ne porte ce titre : rien n'a ete supprime."
         return f"Note supprimee : « {args['titre']} »."
     finally:
         co.close()
 
 
-TOOLS = (retiens, rappelle, oublie)
+def _accorde(ctx: ToolContext, co: sqlite3.Connection) -> None:
+    """Met l'index en accord avec les fichiers du coffre.
+
+    🚨 LES FICHIERS FONT FOI, PAS LA BASE. Le patron ouvre le coffre dans Obsidian, corrige
+    une note, en supprime une autre. Si la base faisait autorite, ses corrections seraient
+    ignorees en silence — le pire des comportements : il croirait avoir corrige, l'agent
+    continuerait a citer l'ancienne version.
+
+    Trois accords, dans cet ordre :
+      - une note qui n'existe qu'en base est exportee en fichier (reprise de l'ancien format) ;
+      - un fichier modifie depuis le dernier passage est reindexe ;
+      - un fichier connu puis disparu fait oublier la note. « Connu puis disparu » et non
+        « absent » : sans cette nuance, un coffre vide effacerait toute la memoire.
+    """
+    # 🚨 On garde le TITRE a cote du nom de fichier. Le nom est derive du titre en remplaçant
+    # les caracteres que Windows refuse : une note « debit/credit » devient « debit-credit.md ».
+    # Deduire le titre du nom au moment d'oublier aurait donc rate exactement ces notes-la,
+    # en silence.
+    co.execute("CREATE TABLE IF NOT EXISTS coffre_vu ("
+               " nom TEXT PRIMARY KEY, quand REAL, titre TEXT)")
+    if "titre" not in [c[1] for c in co.execute("PRAGMA table_info(coffre_vu)")]:
+        co.execute("ALTER TABLE coffre_vu ADD COLUMN titre TEXT")
+    vus = {n: (q, t) for n, q, t in
+           co.execute("SELECT nom, quand, titre FROM coffre_vu").fetchall()}
+    presents = {}
+    for note in coffre.toutes(ctx.workspace):
+        nom = note["chemin"].name
+        presents[nom] = note["chemin"].stat().st_mtime
+        if vus.get(nom, (None, None))[0] == presents[nom]:
+            continue
+        ancienne = co.execute("SELECT id FROM notes WHERE titre = ?",
+                              (note["titre"],)).fetchone()
+        champs = (note["titre"], note["contenu"], note["source"], note["etiquettes"],
+                  presents[nom])
+        if ancienne:
+            co.execute("UPDATE notes SET titre=?,contenu=?,source=?,etiquettes=?,pose=? "
+                       "WHERE id=?", champs + (ancienne[0],))
+        else:
+            co.execute("INSERT INTO notes(titre,contenu,source,etiquettes,pose) "
+                       "VALUES (?,?,?,?,?)", champs)
+        co.execute("INSERT OR REPLACE INTO coffre_vu(nom, quand, titre) VALUES (?,?,?)",
+                   (nom, presents[nom], note["titre"]))
+
+    for nom in set(vus) - set(presents):          # supprime dans Obsidian
+        titre = vus[nom][1] or (nom[:-3] if nom.endswith(".md") else nom)
+        co.execute("DELETE FROM notes WHERE titre = ?", (titre,))
+        co.execute("DELETE FROM coffre_vu WHERE nom = ?", (nom,))
+
+    for titre, contenu, source, etiquettes in co.execute(
+            "SELECT titre,contenu,source,etiquettes FROM notes").fetchall():
+        if coffre.trouve(ctx.workspace, titre) is None:
+            chemin = coffre.ecris(ctx.workspace, titre, contenu, source or "",
+                                  etiquettes or "")
+            co.execute("INSERT OR REPLACE INTO coffre_vu(nom, quand, titre) VALUES (?,?,?)",
+                       (chemin.name, chemin.stat().st_mtime, titre))
+    co.commit()
+
+
+@tool(
+    "ouvre",
+    "Ouvre une note de la memoire en entier, avec ses liens [[...]] et les notes qui "
+    "pointent vers elle. Sans titre, rend la carte du coffre : combien de notes, lesquelles "
+    "font noeud, lesquelles sont isolees.",
+    {"titre": {"type": "string", "description": "Titre de la note. Vide = la carte."}},
+)
+def ouvre(ctx: ToolContext, args: dict[str, Any]) -> str:
+    co = _base(ctx)
+    try:
+        _accorde(ctx, co)
+    finally:
+        co.close()
+    titre = str(args.get("titre") or "").strip()
+
+    if not titre:
+        c = coffre.carte(ctx.workspace)
+        lignes = [f"Coffre : {c['notes']} note(s), {c['liens']} lien(s)."]
+        if c["noeuds"]:
+            lignes.append("Les plus reliees : "
+                          + ", ".join(f"{t} ({n})" for t, n in c["noeuds"]))
+        if c["orphelines"]:
+            lignes.append("Isolees (aucun lien) : " + ", ".join(c["orphelines"][:10]))
+        if c["manquantes"]:
+            lignes.append("Citees mais pas encore ecrites : "
+                          + ", ".join("[[%s]]" % m for m in c["manquantes"][:10]))
+        return clip("\n".join(lignes), ctx.output_limit)
+
+    note = coffre.trouve(ctx.workspace, titre)
+    if note is None:
+        return (f"aucune note intitulee « {titre} ». Utilise `rappelle` pour chercher par "
+                f"mots-cles, ou `ouvre` sans titre pour voir la carte.")
+    sortants = coffre.liens_sortants(note["contenu"])
+    entrants = coffre.retroliens(ctx.workspace, note["titre"])
+    entete = [f"# {note['titre']}"]
+    if note["etiquettes"]:
+        entete.append(f"etiquettes : {note['etiquettes']}")
+    if note["source"]:
+        entete.append(f"source : {note['source']}")
+    pied = []
+    if sortants:
+        pied.append("Renvoie vers : " + ", ".join("[[%s]]" % s for s in sortants))
+    if entrants:
+        pied.append("Cite par : " + ", ".join("[[%s]]" % e for e in entrants))
+    return clip("\n".join(entete) + "\n\n" + note["contenu"]
+                + ("\n\n" + "\n".join(pied) if pied else ""), ctx.output_limit)
+
+
+TOOLS = (retiens, rappelle, oublie, ouvre)

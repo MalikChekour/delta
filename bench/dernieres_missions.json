@@ -3,23 +3,23 @@
   "nom": "sources",
   "famille": "recherche",
   "ok": true,
-  "secondes": 55.4,
+  "secondes": 118.7,
   "detail": "",
-  "reponse": "Voici les deux sources avec leurs chiffres pour l'agglomération de Lagos :\n\n**Source 1 — Wikipedia (Lagos)**\n- Chiffre : 21 000 000 habitants (estimation)\n- Adresse : https://en.wikipedia.org/wiki/Lagos\n- Note : La page indique explicitement « Metro | 21,000,000 (estimated) »\n\n**Source 2 — UNEP (Nigeria)**\n- Chiffre : entre 18 et 20 millions habitants\n- Adresse : https://www.unep.org/nigeria-0\n- Note : La page indique « Lagos alone has an estimated population between 18 and 20 million »\n\n**Concordance :** Les deux chiffres **concordent**. Ils se situent tous les deux dans la fourchette de 18 à"
+  "reponse": "Voici deux sources avec leurs chiffres pour l'agglomération de Lagos en 2024 :\n\n**Source 1 — CityPopulation (site d'agrégation démographique)**\n- Adresse : https://www.citypopulation.de/en/world/agglomerations/\n- Chiffre : 21 900 000 habitants (2024)\n- Remarque : la page indique explicitement « (population of low reliability) »\n\n**Source 2 — Gouvernement de l'État de Lagos (site officiel)**\n- Adresse : https://lagosstate.gov.ng\n- Chiffre : 22 millions d'habitants (22mn+)\n- Remarque : la page d'accueil affiche « Est. Population 22mn+ »\n\n**Concordance ou divergence ?**\nLes deux chiffres sont trè"
  },
  {
   "nom": "luhn",
   "famille": "code",
   "ok": true,
-  "secondes": 27.7,
+  "secondes": 22.8,
   "detail": "",
-  "reponse": "4 tests passés (0.13s). Voici les fichiers créés :\n\n**siret.py** (41 lignes)\n- `valide(siret)` vérifie : longueur 14, tous les chiffres, somme Luhn %10 == 0\n- Algorithme Luhn : de droite à gauche, multiplier par 2 les chiffres de position paire (0-indexed), soustraire 9 si >9, additionner, vérifier %10 == 0\n\n**test_siret.py** (18 lignes)\n- test_siret_valide_1 : 73282932000074 → True\n- test_siret_valide_2 : 40483304800022 → True\n- test_siret_invalide_1 : 73282932000075 → False\n- test_siret_invalide_2 : '1234' → False"
+  "reponse": "**Résultat : 4 tests passés**\n\n- `test_siret_valide_1` : ✓\n- `test_siret_valide_2` : ✓\n- `test_siret_invalide_1` : ✓\n- `test_siret_invalide_2` : ✓\n\nLes deux SIRET fournis sont valides, le troisième est invalide (chiffre de contrôle incorrect), et la chaîne trop courte est rejetée."
  },
  {
   "nom": "session",
   "famille": "donnees",
   "ok": true,
-  "secondes": 29.7,
+  "secondes": 27.9,
   "detail": "",
   "reponse": "900\n900\n899\n899\n899\n899\n898\n898\n898\n898"
  },
@@ -27,7 +27,7 @@
   "nom": "page_js",
   "famille": "navigateur",
   "ok": true,
-  "secondes": 16.4,
+  "secondes": 16.0,
   "detail": "",
   "reponse": "ORAGE-7741"
  },
@@ -35,32 +35,32 @@
   "nom": "voir",
   "famille": "vision",
   "ok": true,
-  "secondes": 10.6,
+  "secondes": 8.2,
   "detail": "",
-  "reponse": "La barre la plus haute est la barre **Sud**, de couleur **rouge**."
+  "reponse": "La barre la plus haute est celle située au-dessus du texte « Sud », et elle est de couleur rouge."
  },
  {
   "nom": "ecouter",
   "famille": "audio",
   "ok": true,
-  "secondes": 26.6,
+  "secondes": 25.6,
   "detail": "",
-  "reponse": "Fichier `tournesol.txt` créé avec le mot « soleil » comme demandé."
+  "reponse": "Fichier `tournesol.txt` créé avec le mot \"soleil\" comme demandé."
  },
  {
   "nom": "memoire",
   "famille": "memoire",
   "ok": true,
-  "secondes": 11.2,
+  "secondes": 10.7,
   "detail": "",
-  "reponse": "8814. Source : notes de la conversation (2026-09-13)."
+  "reponse": "8814"
  },
  {
   "nom": "chaine",
   "famille": "composite",
   "ok": true,
-  "secondes": 27.4,
+  "secondes": 28.9,
   "detail": "",
-  "reponse": "La tendance monte. La courbe part d'environ 40 et atteint environ 230, avec des fluctuations mais une direction générale vers le haut."
+  "reponse": "Le graphique a été créé et je l'ai regardé.\n\n**Tendance : ASCENDANTE**\n\nLa courbe part d'environ 40 (au début, date 2026-07-01) et monte progressivement jusqu'à environ 230 (à la fin, date 2026-08-29). Il y a quelques fluctuations (basses et hautes) mais la direction globale est clairement vers le haut."
  }
 ]

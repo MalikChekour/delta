@@ -41,7 +41,8 @@ NOTES = [
      "outils navigateur_onglets, navigateur_lire, navigateur_agir, navigateur_capture et "
      "navigateur_fermer s'y connectent proprement. Je n'y touche jamais autrement. 22346 : le terminal MT5. 18789 et 18791 : node. 3389 : "
      "RDP. 5985 : WinRM. Pour lancer un serveur local, choisir au-dessus de 9300 et dire "
-     "lequel.",
+     "lequel. "
+     "Voir aussi [[machine — le navigateur]] et [[machine — obscura et le port 9222]].",
      "machine,ports,reseau,danger"),
 
     ("machine — programmes a ne jamais tuer",
@@ -49,7 +50,8 @@ NOTES = [
      "MT5, trading en cours. hermes.exe dans AppData\\Local\\hermes\\hermes-agent : c'est "
      "NousResearch/hermes-agent avec le profil orderflow — il porte le meme nom que moi sans "
      "etre moi. Avant tout taskkill ou Stop-Process, verifier la LIGNE DE COMMANDE de la "
-     "cible, jamais seulement son nom.",
+     "cible, jamais seulement son nom. "
+     "Voir aussi [[machine — ports occupes]] et [[machine — le navigateur]].",
      "machine,processus,danger"),
 
     ("machine — reseau et recherche",
@@ -68,7 +70,8 @@ NOTES = [
      "HERMES_MAX_TOKENS (8192), HERMES_EXEC_TIMEOUT (120 s), HERMES_REQUEST_TIMEOUT (300 s), "
      "HERMES_OUTPUT_LIMIT (12000 caracteres), HERMES_HISTORY_MESSAGES (60). Je nomme la "
      "variable exacte et sa valeur actuelle, ou je dis que je ne sais pas — je ne propose "
-     "pas trois candidats.",
+     "pas trois candidats. "
+     "Voir aussi [[machine — ou je vis sur le disque]].",
      "machine,configuration,reglages,limites"),
 
     ("machine — obscura et le port 9222",
@@ -80,7 +83,8 @@ NOTES = [
      r"🚨 LA COMMANDE EXACTE EST : bin\obscura.exe serve --port 9310 — avec un ANTISLASH et "
      r"SANS ./ devant. Mesure du 13/09 : j'ai essaye ./bin/obscura.exe, puis invente un "
      r"chemin C:\Users\patron\ qui n'existe pas, et brule sept appels dont un delai de 120 s "
-     "sur un Get-ChildItem recursif. cmd n'est pas un shell POSIX : ./ n'y veut rien dire.",
+     "sur un Get-ChildItem recursif. cmd n'est pas un shell POSIX : ./ n'y veut rien dire. "
+     "Voir aussi [[machine — ports occupes]] et [[machine — ou je vis sur le disque]].",
      "machine,obscura,ports,navigateur,danger"),
 
     ("machine — ou je vis sur le disque",
@@ -118,7 +122,8 @@ NOTES = [
      "le code. Je peux les REGARDER. Ordre de travail : ecran_etat, puis ecran_voir qui rend "
      "le texte AVEC les coordonnees, puis souris a ces coordonnees, puis relire pour "
      "verifier. Je ne vois que du texte : une image ou une icone sans libelle m'est "
-     "invisible, et je dois le dire.",
+     "invisible, et je dois le dire. "
+     "Voir aussi [[machine — verifier ce que j'ai fait]] et [[machine — mes yeux et mes oreilles]].",
      "machine,ecran,souris,clavier,mains"),
 
     ("machine — mes yeux et mes oreilles",
@@ -128,7 +133,8 @@ NOTES = [
      "ecran_voir, lui, ne rend que le TEXTE lu a l'ecran avec ses coordonnees : une icone "
      "sans libelle ou une photo lui echappent, c'est la que regarde sert. L'outil ecoute "
      "transcrit un son EN LOCAL avec faster-whisper modele small, francais par defaut ; rien "
-     "ne sort de la machine. Les messages vocaux du patron m'arrivent deja transcrits.",
+     "ne sort de la machine. Les messages vocaux du patron m'arrivent deja transcrits. "
+     "Voir aussi [[machine — ecran, souris et clavier]].",
      "machine,yeux,oreilles,vision,audio"),
 
     ("machine — verifier ce que j'ai fait",
@@ -146,7 +152,8 @@ NOTES = [
      "ou le patron n'est pas connecte — sur TikTok, YouTube, Google, Redbubble et Pinterest "
      "je peux lire et capturer, cliquer y est refuse par le code. Je n'ouvre qu'un onglet et "
      "je le ferme en partant ; je ne touche jamais un onglet que je n'ai pas ouvert. Une "
-     "capture va dans mon workspace : le patron la recupere avec /get nom.png.",
+     "capture va dans mon workspace : le patron la recupere avec /get nom.png. "
+     "Voir aussi [[machine — ecran, souris et clavier]] et [[machine — ports occupes]].",
      "machine,navigateur,chrome,web"),
 
     ("machine — ce que je ne dois pas oublier de verifier",
