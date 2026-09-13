@@ -3,31 +3,31 @@
   "nom": "sources",
   "famille": "recherche",
   "ok": true,
-  "secondes": 118.7,
+  "secondes": 122.7,
   "detail": "",
-  "reponse": "Voici deux sources avec leurs chiffres pour l'agglomération de Lagos en 2024 :\n\n**Source 1 — CityPopulation (site d'agrégation démographique)**\n- Adresse : https://www.citypopulation.de/en/world/agglomerations/\n- Chiffre : 21 900 000 habitants (2024)\n- Remarque : la page indique explicitement « (population of low reliability) »\n\n**Source 2 — Gouvernement de l'État de Lagos (site officiel)**\n- Adresse : https://lagosstate.gov.ng\n- Chiffre : 22 millions d'habitants (22mn+)\n- Remarque : la page d'accueil affiche « Est. Population 22mn+ »\n\n**Concordance ou divergence ?**\nLes deux chiffres sont trè"
+  "reponse": "Voici deux chiffres vérifiés pour l'agglomération de Lagos, avec leurs adresses :\n\n1) 12 792 000 habitants (2025)\n- Source : World Urbanization Prospects 2025 — Tableau des villes, ligne « Lagos, Nigeria »\n- Adresse : https://population.un.org/wup/assets/Publications/undesa_pd_2025_wup2025_summary_of_results_final.pdf\n\n2) 13–27 millions d'habitants\n- Source : World Bank — « Lagos Diagnostic Study and Pathway for Transformation » (2023)\n- Résumé exécutif, page 5 : « Lagos is one of the largest and fastest growing mega-cities in Africa at 13-27 million »\n- Adresse : https://documents1.worldbank."
  },
  {
   "nom": "luhn",
   "famille": "code",
   "ok": true,
-  "secondes": 22.8,
+  "secondes": 117.3,
   "detail": "",
-  "reponse": "**Résultat : 4 tests passés**\n\n- `test_siret_valide_1` : ✓\n- `test_siret_valide_2` : ✓\n- `test_siret_invalide_1` : ✓\n- `test_siret_invalide_2` : ✓\n\nLes deux SIRET fournis sont valides, le troisième est invalide (chiffre de contrôle incorrect), et la chaîne trop courte est rejetée."
+  "reponse": "**Résultat réel de pytest :**\n\n```\n============================= test session starts =============================\nplatform win32 -- Python 3.11.9, pytest-9.0.2, pluggy-1.6.0\ncachedir: .pytest_cache\nrootdir: C:\\Users\\Administrator\\agentmk06-bot\nconfigfile: pyproject.toml\nplugins: anyio-4.12.1, asyncio-1.3.0\nasyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function\ncollecting ... collected 4 items\n\ntest_siret.py::test_siret_valide_1 PASSED                                [ 25%]\ntest_siret.py::test_siret_valide_2 PASSED                "
  },
  {
   "nom": "session",
   "famille": "donnees",
   "ok": true,
-  "secondes": 27.9,
+  "secondes": 23.4,
   "detail": "",
-  "reponse": "900\n900\n899\n899\n899\n899\n898\n898\n898\n898"
+  "reponse": "top.csv créé avec les dix plus grandes valeurs, une par ligne, de la plus grande à la plus petite, sans en-tête."
  },
  {
   "nom": "page_js",
   "famille": "navigateur",
   "ok": true,
-  "secondes": 16.0,
+  "secondes": 13.1,
   "detail": "",
   "reponse": "ORAGE-7741"
  },
@@ -35,23 +35,23 @@
   "nom": "voir",
   "famille": "vision",
   "ok": true,
-  "secondes": 8.2,
+  "secondes": 8.1,
   "detail": "",
-  "reponse": "La barre la plus haute est celle située au-dessus du texte « Sud », et elle est de couleur rouge."
+  "reponse": "La barre la plus haute est celle située au-dessus de l'inscription « Sud », et elle est de couleur rouge."
  },
  {
   "nom": "ecouter",
   "famille": "audio",
   "ok": true,
-  "secondes": 25.6,
+  "secondes": 27.4,
   "detail": "",
-  "reponse": "Fichier `tournesol.txt` créé avec le mot \"soleil\" comme demandé."
+  "reponse": "Fichier `tournesol.txt` créé avec le mot \"soleil\"."
  },
  {
   "nom": "memoire",
   "famille": "memoire",
   "ok": true,
-  "secondes": 10.7,
+  "secondes": 10.5,
   "detail": "",
   "reponse": "8814"
  },
@@ -59,8 +59,8 @@
   "nom": "chaine",
   "famille": "composite",
   "ok": true,
-  "secondes": 28.9,
+  "secondes": 34.2,
   "detail": "",
-  "reponse": "Le graphique a été créé et je l'ai regardé.\n\n**Tendance : ASCENDANTE**\n\nLa courbe part d'environ 40 (au début, date 2026-07-01) et monte progressivement jusqu'à environ 230 (à la fin, date 2026-08-29). Il y a quelques fluctuations (basses et hautes) mais la direction globale est clairement vers le haut."
+  "reponse": "La tendance monte.\n\nSur le graphique, la courbe part d'environ 40 le 1er juillet et finit à environ 230 le 29 août. L'ascension est régulière avec quelques fluctuations ponctuelles mais globalement constante vers le haut."
  }
 ]
